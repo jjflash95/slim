@@ -384,7 +384,7 @@ fn eval_branches(branches: Vec<(Expr, Vec<Expr>)>, ctx: RuntimeContext) -> EResu
         if eval(cond, ctx.mut_ref())?.to_bool() {
             let res = eval_body(body, ctx.mut_ref())?;
             if ctx.borrow().has_eval() {
-                return Ok(last);
+                return Ok(Value::Nil);
             }
             return Ok(res);
         }
