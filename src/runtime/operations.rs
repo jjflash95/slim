@@ -16,6 +16,7 @@ pub trait BinOps {
     fn gte(self, other: Self) -> EResult;
     fn lt(self, other: Self) -> EResult;
     fn lte(self, other: Self) -> EResult;
+    fn contains(self, ohter: Self) -> EResult;
     fn and(self, other: Self) -> EResult;
     fn or(self, other: Self) -> EResult;
 }
@@ -68,10 +69,11 @@ impl BinOps for Value {
             Token::Gte => self.gte(other),
             Token::Lt => self.lt(other),
             Token::Lte => self.lte(other),
+            Token::In => self.contains(other),
             Token::And => self.and(other),
             Token::Or => self.or(other),
             _ => Err(RuntimeError(format!(
-                "Cannot perform binary operation with token {:?}",
+                "Cannot perform binary operation with token `{:?}`",
                 op
             ))),
         }
@@ -229,6 +231,23 @@ impl BinOps for Value {
             (l, r) => Err(RuntimeError(format!(
                 "Cannot compare lt {:?} to {:?}",
                 l, r
+            ))),
+        }
+    }
+
+    fn contains(self, other: Self) -> EResult {
+        match other {
+            Value::Sequence(s) => Ok(Value::Bool(s.contains(&self))),
+            Value::Collection(f) => Ok(Value::Bool(
+                f.contains_key(TryInto::<String>::try_into(self)?.as_str()),
+            )),
+            Value::StringLiteral(s) => Ok(Value::Bool(
+                s.contains(TryInto::<String>::try_into(self)?.as_str()),
+            )),
+            _ => Err(RuntimeError(format!(
+                "Cannot check if <{}> contains <{}>",
+                self.type_hint(),
+                other.type_hint()
             ))),
         }
     }

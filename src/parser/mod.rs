@@ -18,6 +18,7 @@ pub enum Token {
     Gte,
     Lt,
     Lte,
+    In,
     And,
     Or,
     Add,
@@ -118,6 +119,7 @@ impl From<&str> for Token {
             "<" => Token::Lt,
             ">=" => Token::Gte,
             "<=" => Token::Lte,
+            "in " => Token::In,
             "&&" => Token::And,
             "||" => Token::Or,
             ":" => Token::Set,
@@ -275,6 +277,7 @@ fn parse_compare(input: &str) -> IResult<&str, Expr> {
         wrap("<="),
         wrap("=="),
         wrap("!="),
+        wrap("in "), // spaces needed to not match "INstanceof" or "linkedIN"
     ))(input)
     .map(|(i, o)| (i, Token::from(o)))
     {
