@@ -57,6 +57,36 @@ pub fn replace(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     })
 }
 
+pub fn split(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+    let arg = next_arg(args, "string")?;
+    let sep: String = next_arg(args, "separator")
+        .unwrap_or(Value::StringLiteral("".to_string()))
+        .try_into()?;
+
+    Ok(match arg {
+        Value::StringLiteral(s) => match sep.as_str() {
+            "" => {
+                Value::Sequence(
+                    s.chars()
+                        .map(|c| Value::StringLiteral(c.to_string()))
+                        .collect(),
+                )
+            },
+            sep => {
+                Value::Sequence(
+                    s.split(sep)
+                        .map(|s| Value::StringLiteral(s.to_string()))
+                        .collect(),
+                )
+            }
+        },
+        _ => Err(RuntimeError(format!(
+            "Expected string but got <{}> instead",
+            arg
+        )))?,
+    })
+}
+
 pub fn range(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     let start = next_arg(args, "start")?.try_into()?;
     let end: i128 = next_arg(args, "end")?.try_into()?;

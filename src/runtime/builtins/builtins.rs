@@ -24,6 +24,7 @@ pub fn defaults() -> HashMap<String, Value> {
         ("pop".to_string(), wrap_builtin(&stdlib::pop)),
         ("concat".to_string(), wrap_builtin(&stdlib::concat)),
         ("to_string".to_string(), wrap_builtin(&stdlib::to_string)),
+        ("split".to_string(), wrap_builtin(&stdlib::split)),
         ("slice".to_string(), wrap_builtin(&stdlib::slice)),
         ("len".to_string(), wrap_builtin(&stdlib::len)),
         ("trim".to_string(), wrap_builtin(&stdlib::trim)),
