@@ -65,20 +65,16 @@ pub fn split(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
 
     Ok(match arg {
         Value::StringLiteral(s) => match sep.as_str() {
-            "" => {
-                Value::Sequence(
-                    s.chars()
-                        .map(|c| Value::StringLiteral(c.to_string()))
-                        .collect(),
-                )
-            },
-            sep => {
-                Value::Sequence(
-                    s.split(sep)
-                        .map(|s| Value::StringLiteral(s.to_string()))
-                        .collect(),
-                )
-            }
+            "" => Value::Sequence(
+                s.chars()
+                    .map(|c| Value::StringLiteral(c.to_string()))
+                    .collect(),
+            ),
+            sep => Value::Sequence(
+                s.split(sep)
+                    .map(|s| Value::StringLiteral(s.to_string()))
+                    .collect(),
+            ),
         },
         _ => Err(RuntimeError(format!(
             "Expected string but got <{}> instead",
