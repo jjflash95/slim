@@ -167,7 +167,9 @@ impl BinOps for Value {
             (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l > r)),
             (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l > r as f64)),
             (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) > r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => Ok(Value::Bool(l.len() > r.len())),
+            (Value::StringLiteral(l), Value::StringLiteral(r)) => {
+                Ok(Value::Bool(l.len() > r.len()))
+            }
             (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l.len() > r.len())),
             // (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l.len() > r.len())), // should I?
             (l, r) => Err(RuntimeError(format!(
@@ -183,7 +185,9 @@ impl BinOps for Value {
             (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l >= r)),
             (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l >= r as f64)),
             (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) >= r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => Ok(Value::Bool(l.len() >= r.len())),
+            (Value::StringLiteral(l), Value::StringLiteral(r)) => {
+                Ok(Value::Bool(l.len() >= r.len()))
+            }
             (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l.len() >= r.len())),
             // (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l.len() >= r.len())), // should I?
             (l, r) => Err(RuntimeError(format!(
@@ -199,7 +203,9 @@ impl BinOps for Value {
             (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l < r)),
             (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l < r as f64)),
             (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) < r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => Ok(Value::Bool(l.len() < r.len())),
+            (Value::StringLiteral(l), Value::StringLiteral(r)) => {
+                Ok(Value::Bool(l.len() < r.len()))
+            }
             (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l.len() < r.len())),
             // (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l.len() < r.len())),
             (l, r) => Err(RuntimeError(format!(
@@ -215,7 +221,9 @@ impl BinOps for Value {
             (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l <= r)),
             (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l <= r as f64)),
             (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) <= r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => Ok(Value::Bool(l.len() <= r.len())),
+            (Value::StringLiteral(l), Value::StringLiteral(r)) => {
+                Ok(Value::Bool(l.len() <= r.len()))
+            }
             (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l.len() <= r.len())),
             // (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l.len() <= r.len())),
             (l, r) => Err(RuntimeError(format!(
@@ -232,8 +240,10 @@ impl BinOps for Value {
             (&Value::Bool(l), other) => Ok(if !l { self } else { other }),
             (&Value::StringLiteral(ref l), other) => Ok(if l.is_empty() { self } else { other }),
             (&Value::Nil, ..) => Ok(self),
-            (&Value::Collection(ref fields), other) => Ok(if fields.is_empty() { self } else { other }),
-            (&Value::Func{ .. }, other) => Ok(other),
+            (&Value::Collection(ref fields), other) => {
+                Ok(if fields.is_empty() { self } else { other })
+            }
+            (&Value::Func { .. }, other) => Ok(other),
             (l, r) => Err(RuntimeError(format!(
                 "Cannot compare && {:?} to {:?}",
                 l, r
@@ -248,7 +258,9 @@ impl BinOps for Value {
             (&Value::Bool(l), other) => Ok(if !l { other } else { self }),
             (&Value::StringLiteral(ref l), other) => Ok(if l.is_empty() { other } else { self }),
             (&Value::Nil, other) => Ok(other),
-            (&Value::Collection(ref fields), other) => Ok(if fields.is_empty() { other } else { self }),
+            (&Value::Collection(ref fields), other) => {
+                Ok(if fields.is_empty() { other } else { self })
+            }
             (&Value::Func { .. }, ..) => Ok(self),
             (l, r) => Err(RuntimeError(format!(
                 "Cannot compare || {:?} to {:?}",
@@ -267,24 +279,31 @@ impl Helpers for Value {
     fn concat(self, other: Value) -> EResult {
         match self {
             Value::StringLiteral(a) => Ok(Value::StringLiteral(
-                a + TryInto::<String>::try_into(other)?.as_ref()
+                a + TryInto::<String>::try_into(other)?.as_ref(),
             )),
-            Value::Sequence(values) => {
-                Ok(Value::Sequence(
-                    values.into_iter().chain(TryInto::<Vec<Value>>::try_into(other)?)
-                    .collect()
-                ))
-            },
-            _ => Err(RuntimeError(format!("Cannot merge {} to {}", self.type_hint(), other.type_hint()))),
+            Value::Sequence(values) => Ok(Value::Sequence(
+                values
+                    .into_iter()
+                    .chain(TryInto::<Vec<Value>>::try_into(other)?)
+                    .collect(),
+            )),
+            _ => Err(RuntimeError(format!(
+                "Cannot merge {} to {}",
+                self.type_hint(),
+                other.type_hint()
+            ))),
         }
     }
-    
+
     fn len(self) -> EResult {
         match self {
             Value::StringLiteral(s) => Ok(Value::Int(s.len() as i128)),
             Value::Sequence(values) => Ok(Value::Int(values.len() as i128)),
             Value::Collection(fields) => Ok(Value::Int(fields.len() as i128)),
-            v => Err(RuntimeError(format!("Cannot get len of: <{}>", v.type_hint())))
+            v => Err(RuntimeError(format!(
+                "Cannot get len of: <{}>",
+                v.type_hint()
+            ))),
         }
     }
 }

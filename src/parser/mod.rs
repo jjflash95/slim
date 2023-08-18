@@ -1,7 +1,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::take_while;
 use nom::character::complete::{alpha1, one_of};
-use nom::combinator::{opt, recognize, not, peek};
+use nom::combinator::{not, opt, peek, recognize};
 use nom::multi::{fold_many0, many0, many1, separated_list0};
 use nom::number::complete::recognize_float_parts;
 use nom::sequence::{delimited, pair, tuple};
@@ -215,20 +215,13 @@ fn parse_func(input: &str) -> IResult<&str, Expr> {
         } else {
             None
         };
-        (
-            i,
-            Expr::Func {
-                name: name,
-                args,
-                body,
-            },
-        )
+        (i, Expr::Func { name, args, body })
     })
 }
 
 fn parse_assignment(input: &str) -> IResult<&str, Expr> {
     let (mut input, mut left) = alt((parse_mutate, parse_access))(input)?; //access
-    while let Ok((next, (_,_))) = tuple((char('='), peek(not(char('=')))))(input) {
+    while let Ok((next, (_, _))) = tuple((char('='), peek(not(char('=')))))(input) {
         let (i, right) = parse(next)?;
         input = i;
         left = Expr::Assign {
@@ -238,7 +231,6 @@ fn parse_assignment(input: &str) -> IResult<&str, Expr> {
     }
     Ok((input, left))
 }
-
 
 fn parse_collection_assignment(input: &str) -> IResult<&str, Expr> {
     let (mut input, mut left) = alt((parse_mutate, parse_access))(input)?; //access
@@ -254,7 +246,8 @@ fn parse_collection_assignment(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_mutate(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("deref "), alt((parse_term, parse_access))))(input).map(|(i, (_, o))| (i, Expr::Deref(o.into())))
+    tuple((wrap("deref "), alt((parse_term, parse_access))))(input)
+        .map(|(i, (_, o))| (i, Expr::Deref(o.into())))
 }
 
 fn parse_andor(input: &str) -> IResult<&str, Expr> {
@@ -313,7 +306,8 @@ fn parse_add(input: &str) -> IResult<&str, Expr> {
 
 fn parse_mult(input: &str) -> IResult<&str, Expr> {
     let (mut input, mut left) = parse_assignment(input)?;
-    while let Ok((next, op)) = alt((wrap("*"), wrap("/"), wrap("%")))(input).map(|(i, o)| (i, Token::from(o)))
+    while let Ok((next, op)) =
+        alt((wrap("*"), wrap("/"), wrap("%")))(input).map(|(i, o)| (i, Token::from(o)))
     {
         let (i, right) = parse_assignment(next)?;
         input = i;
@@ -380,7 +374,8 @@ fn parse_access(input: &str) -> IResult<&str, Expr> {
                 }
             }
             Some('[') => {
-                let (i, right) = parse(&input[1..]).unwrap_or((&input[1..], Expr::Term(Token::Nil)));
+                let (i, right) =
+                    parse(&input[1..]).unwrap_or((&input[1..], Expr::Term(Token::Nil)));
                 input = char(']')(i)?.0;
                 left = Expr::Access {
                     target: Box::new(left),
@@ -436,7 +431,8 @@ fn parse_grouped(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_break(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("break"), opt(parse)))(input).map(|(i, (_, o))| (i, Expr::Break(o.unwrap_or(Expr::Nil).into())))
+    tuple((wrap("break"), opt(parse)))(input)
+        .map(|(i, (_, o))| (i, Expr::Break(o.unwrap_or(Expr::Nil).into())))
 }
 
 fn parse_return(input: &str) -> IResult<&str, Expr> {
@@ -481,7 +477,12 @@ fn parse_string_literal(input: &str) -> IResult<&str, Expr> {
         tuple((lwrap("\""), take_while(|c| c != '"'), rwrap("\""))),
         tuple((lwrap("'"), take_while(|c| c != '\''), rwrap("'"))),
     ))(input)
-    .map(|(i, (_, s, _))| (i, Expr::Term(Token::StringLiteral(s.to_owned().replace("\\n", "\n")))))
+    .map(|(i, (_, s, _))| {
+        (
+            i,
+            Expr::Term(Token::StringLiteral(s.to_owned().replace("\\n", "\n"))),
+        )
+    })
 }
 
 fn parse_float(input: &str) -> IResult<&str, Expr> {

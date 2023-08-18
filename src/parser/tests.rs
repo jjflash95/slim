@@ -952,10 +952,7 @@ mod tests {
         let input = "a = &b";
         let expected = Assign {
             target: Term(Identifier("a".to_owned())).into(),
-            value: Ref (
-                Term(Identifier("b".to_owned())).into(),
-            )
-            .into(),
+            value: Ref(Term(Identifier("b".to_owned())).into()).into(),
         };
 
         assert_eq!(parse(input).unwrap().1, expected);
@@ -965,13 +962,11 @@ mod tests {
         ";
         let expected = Assign {
             target: Term(Identifier("a".to_owned())).into(),
-            value: Ref (
-                Access {
-                    target: Term(Identifier("b".to_owned())).into(),
-                    field: Term(Int(0)).into(),
-                }
-                .into(),
-            )
+            value: Ref(Access {
+                target: Term(Identifier("b".to_owned())).into(),
+                field: Term(Int(0)).into(),
+            }
+            .into())
             .into(),
         };
 
@@ -982,16 +977,7 @@ mod tests {
         ";
         let expected = Assign {
             target: Term(Identifier("a".to_owned())).into(),
-            value: Ref (
-                Ref (
-                    Ref (
-                        Term(Identifier("b".to_owned())).into(),
-                    )
-                    .into(),
-                )
-                .into(),
-            )
-            .into(),
+            value: Ref(Ref(Ref(Term(Identifier("b".to_owned())).into()).into()).into()).into(),
         };
 
         assert_eq!(parse(input).unwrap().1, expected);
@@ -1002,10 +988,7 @@ mod tests {
         let input = "b = *a";
         let expected = Assign {
             target: Term(Identifier("b".to_owned())).into(),
-            value: Deref (
-                Term(Identifier("a".to_owned())).into(),
-            )
-            .into(),
+            value: Deref(Term(Identifier("a".to_owned())).into()).into(),
         };
 
         assert_eq!(parse(input).unwrap().1, expected);
@@ -1013,13 +996,7 @@ mod tests {
         let input = "b = **a";
         let expected = Assign {
             target: Term(Identifier("b".to_owned())).into(),
-            value: Deref (
-                Deref (
-                    Term(Identifier("a".to_owned())).into(),
-                )
-                .into(),
-            )
-            .into(),
+            value: Deref(Deref(Term(Identifier("a".to_owned())).into()).into()).into(),
         };
 
         assert_eq!(parse(input).unwrap().1, expected);

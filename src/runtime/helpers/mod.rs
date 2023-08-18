@@ -1,14 +1,15 @@
-
+use crate::runtime::{RuntimeError, Value};
 use core::fmt;
-use crate::runtime::{Value, RuntimeError};
-
 
 impl TryInto<i128> for Value {
     type Error = RuntimeError;
     fn try_into(self) -> Result<i128, Self::Error> {
         match self {
             Value::Int(n) => Ok(n),
-            _ => Err(RuntimeError(format!("Cannot convert {} to int", self.type_hint())))
+            _ => Err(RuntimeError(format!(
+                "Cannot convert {} to int",
+                self.type_hint()
+            ))),
         }
     }
 }
@@ -19,7 +20,10 @@ impl TryInto<String> for Value {
         match self {
             Value::StringLiteral(s) => Ok(s),
             Value::Int(i) => Ok(i.to_string()),
-            _ => Err(RuntimeError(format!("Cannot convert {} to int", self.type_hint())))
+            _ => Err(RuntimeError(format!(
+                "Cannot convert {} to int",
+                self.type_hint()
+            ))),
         }
     }
 }
@@ -29,7 +33,10 @@ impl TryInto<Vec<Value>> for Value {
     fn try_into(self) -> Result<Vec<Value>, Self::Error> {
         match self {
             Value::Sequence(seq) => Ok(seq),
-            _ => Err(RuntimeError(format!("Cannot convert {} to int", self.type_hint())))
+            _ => Err(RuntimeError(format!(
+                "Cannot convert {} to int",
+                self.type_hint()
+            ))),
         }
     }
 }
@@ -86,7 +93,7 @@ impl fmt::Debug for Value {
                 name, params, locals, body
             ),
             Value::Ref(inner) => write!(f, "Ref({:?})", inner),
-            _ => write!(f, "")
+            _ => write!(f, ""),
         }
     }
 }
@@ -114,7 +121,11 @@ fn format(value: &Value, indent: u8) -> String {
             s
         }
         Value::Func { name, params, .. } => {
-            format!("func<{}>({})", &name.as_ref().unwrap_or(&"anonymous".to_string()), params.join(","))
+            format!(
+                "func<{}>({})",
+                &name.as_ref().unwrap_or(&"anonymous".to_string()),
+                params.join(",")
+            )
         }
         Value::Sequence(values) => {
             let mut s = String::new();

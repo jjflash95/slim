@@ -4,7 +4,6 @@ mod slim;
 
 use std::env;
 
-
 fn main() -> Result<(), i32> {
     let args: Vec<String> = env::args().collect();
 

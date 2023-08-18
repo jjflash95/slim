@@ -1,14 +1,12 @@
-use std::{rc::Rc, collections::HashMap};
+use crate::runtime::{context::RuntimeContext, Value};
 use crate::runtime::{EResult, RuntimeError};
-use crate::runtime::{Value, context::RuntimeContext};
+use std::{collections::HashMap, rc::Rc};
 
+use crate::runtime::builtins::filesystem;
 use crate::runtime::builtins::io;
 use crate::runtime::builtins::net;
 use crate::runtime::builtins::stdlib;
-use crate::runtime::builtins::filesystem;
 use crate::runtime::builtins::time;
-
-
 
 pub type BuiltinFunc = Rc<Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult>>;
 

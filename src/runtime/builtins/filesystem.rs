@@ -1,10 +1,13 @@
-
-use std::{fs::File, io::{Read, SeekFrom, Write, Seek}, path::Path, sync::{Arc, Mutex}, collections::HashMap, rc::Rc};
 use crate::runtime::builtins::next_arg;
-use crate::runtime::{Value, context::RuntimeContext, EResult};
-
-
-
+use crate::runtime::{context::RuntimeContext, EResult, Value};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{Read, Seek, SeekFrom, Write},
+    path::Path,
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
 pub fn open(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     let path: String = next_arg(args, "path")?.try_into()?;
@@ -35,36 +38,26 @@ pub fn open(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
         } else {
             0
         };
-        seeker.lock().unwrap().seek(SeekFrom::Start(bytes as u64)).unwrap();
+        seeker
+            .lock()
+            .unwrap()
+            .seek(SeekFrom::Start(bytes as u64))
+            .unwrap();
         Ok(Value::Nil)
     });
 
-    let write: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> = Box::new(move |args, _| {
-        let contents: String = next_arg(args, "Content")?.try_into()?;
-        match writer
-            .lock()
-            .unwrap()
-            .write_all(contents.as_bytes())
-        {
-            Ok(_) => Ok(Value::Bool(true)),
-            Err(_) => Ok(Value::Bool(false)),
-        }
-    });
+    let write: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> =
+        Box::new(move |args, _| {
+            let contents: String = next_arg(args, "Content")?.try_into()?;
+            match writer.lock().unwrap().write_all(contents.as_bytes()) {
+                Ok(_) => Ok(Value::Bool(true)),
+                Err(_) => Ok(Value::Bool(false)),
+            }
+        });
 
-    Ok(Value::Collection(
-        HashMap::from([
-            (
-                "read".to_string(),
-                Value::Builtin(Rc::new(read))
-            ),
-            (
-                "seek".to_string(),
-                Value::Builtin(Rc::new(seek))
-            ),
-            (
-                "write".to_string(),
-                Value::Builtin(Rc::new(write))
-            ),
-        ]),
-    ))
+    Ok(Value::Collection(HashMap::from([
+        ("read".to_string(), Value::Builtin(Rc::new(read))),
+        ("seek".to_string(), Value::Builtin(Rc::new(seek))),
+        ("write".to_string(), Value::Builtin(Rc::new(write))),
+    ])))
 }

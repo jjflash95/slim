@@ -7,12 +7,11 @@ use crate::runtime::Value;
 
 use crate::runtime::builtins;
 
-use super::{RuntimeError, InnerReference};
+use super::{InnerReference, RuntimeError};
 
 pub type RuntimeContext = Rc<RefCell<Context>>;
 
 pub static INSTANCE: &str = "self";
-
 
 pub trait MutRef {
     fn mut_ref(&self) -> Self;
@@ -31,8 +30,7 @@ impl Default for Value {
 }
 
 #[derive(Default)]
-pub struct Context
-{
+pub struct Context {
     pub instance_name: Option<String>,
     pub parent: Option<RuntimeContext>,
     pub scope: HashMap<String, Value>,
@@ -72,11 +70,8 @@ impl Context {
     }
 
     pub fn type_hint(&self, key: &str, ctx: &RuntimeContext) -> Option<String> {
-        if let Some(value) = self.get_cloned(key) {
-            Some(value.resolve(ctx).unwrap_or(Value::Nil).type_hint())
-        } else {
-            None
-        }
+        self.get_cloned(key)
+            .map(|value| value.resolve(ctx).unwrap_or(Value::Nil).type_hint())
     }
 
     pub fn get_locals(&self) -> HashMap<String, Value> {
@@ -106,9 +101,13 @@ impl Context {
     }
 }
 
-
 pub trait Mutate {
-    fn mutate(&mut self, name: String, path: Vec<Value>, value: Value) -> Result<Value, RuntimeError>;
+    fn mutate(
+        &mut self,
+        name: String,
+        path: Vec<Value>,
+        value: Value,
+    ) -> Result<Value, RuntimeError>;
 }
 
 impl Mutate for Context {
@@ -116,9 +115,8 @@ impl Mutate for Context {
         &mut self,
         mut name: String,
         mut path: Vec<Value>,
-        value: Value
+        value: Value,
     ) -> Result<Value, RuntimeError> {
-
         let mut _ref = None;
 
         while let Some(next) = self.peek_ref(&name) {
@@ -126,17 +124,17 @@ impl Mutate for Context {
             let (n, p) = next.into();
             name = n;
             path.append(&mut p.clone().into_iter().rev().collect());
-        };
+        }
 
-        if path.len() == 0 {
+        if path.is_empty() {
             return if let Some(src) = self.scope.get_mut(&name) {
                 *src = value;
                 Ok(Value::Nil)
             } else if let Some(parent) = &mut self.parent {
-                return parent.borrow_mut().mutate(name, path, value)
+                return parent.borrow_mut().mutate(name, path, value);
             } else {
                 Err(RuntimeError(format!("Cannot mutate: {:?}", name)))?
-            }
+            };
         };
 
         if let Some(mut src) = self.scope.get_mut(&name) {
@@ -150,7 +148,7 @@ impl Mutate for Context {
                             let (name, mut np) = inner.to_owned().into();
                             path.push(Value::Int(i));
                             path.append(&mut np);
-                            return self.mutate(name.to_string(), path, value);
+                            return self.mutate(name, path, value);
                         };
                         let items = src.as_sequence_mut()?;
                         src = items.get_mut(i as usize).ok_or_else(|| {
@@ -166,7 +164,7 @@ impl Mutate for Context {
                             let (name, mut np) = inner.to_owned().into();
                             path.push(Value::StringLiteral(s));
                             path.append(&mut np);
-                            return self.mutate(name.to_string(), path, value);
+                            return self.mutate(name, path, value);
                         };
 
                         let fields = src.as_collection_mut()?;
@@ -181,7 +179,7 @@ impl Mutate for Context {
                             let (name, mut np) = inner.to_owned().into();
                             path.push(Value::Nil);
                             path.append(&mut np);
-                            return self.mutate(name.to_string(), path, value);
+                            return self.mutate(name, path, value);
                         };
 
                         let items = src.as_sequence_mut()?;
@@ -190,7 +188,10 @@ impl Mutate for Context {
                             return Ok(Value::Nil);
                         }
                     }
-                    v => Err(RuntimeError(format!("[mutate] Cannot access path {} on: {:?}", v, src)))?,
+                    v => Err(RuntimeError(format!(
+                        "[mutate] Cannot access path {} on: {:?}",
+                        v, src
+                    )))?,
                 }
             }
         } else if let Some(parent) = &mut self.parent {
@@ -199,5 +200,4 @@ impl Mutate for Context {
             Err(RuntimeError(format!("Cannot mutate: {:?}", name)))
         }
     }
-
 }

@@ -1,4 +1,3 @@
-
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::{
@@ -7,10 +6,9 @@ use std::{
     net::TcpListener,
 };
 
-use crate::runtime::{Value, EResult, RuntimeError};
-use crate::runtime::context::RuntimeContext;
 use crate::runtime::builtins::next_arg;
-
+use crate::runtime::context::RuntimeContext;
+use crate::runtime::{EResult, RuntimeError, Value};
 
 pub fn socket(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     let host: String = next_arg(args, "host")?.try_into()?;
@@ -27,7 +25,9 @@ pub fn socket(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
                 Box::new(move |_, _| {
                     let mut buffer = [0; 1024];
                     reader.lock().unwrap().read(&mut buffer).unwrap();
-                    return Ok(Value::StringLiteral(String::from_utf8_lossy(&buffer[..]).into()));
+                    return Ok(Value::StringLiteral(
+                        String::from_utf8_lossy(&buffer[..]).into(),
+                    ));
                 });
 
             let write: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> =
@@ -39,33 +39,26 @@ pub fn socket(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
                         match res {
                             Ok(0) => break,
                             Ok(n) => buf = &buf[n..],
-                            Err(_) => {
-                                return Err(RuntimeError("Failed socket.write".to_owned()))
-                            }
+                            Err(_) => return Err(RuntimeError("Failed socket.write".to_owned())),
                         };
                     }
                     Ok(Value::Nil)
                 });
 
-                let close: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> =
+            let close: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> =
                 Box::new(move |_: &mut Vec<Value>, _: RuntimeContext| {
-                    closer.lock().unwrap().shutdown(std::net::Shutdown::Both).unwrap();
+                    closer
+                        .lock()
+                        .unwrap()
+                        .shutdown(std::net::Shutdown::Both)
+                        .unwrap();
                     Ok(Value::Nil)
                 });
 
             let fields = HashMap::from([
-                (
-                    "listen".to_string(),
-                    Value::Builtin(Rc::new(listen)),
-                ),
-                (
-                    "write".to_string(),
-                    Value::Builtin(Rc::new(write)),
-                ),
-                (
-                    "close".to_string(),
-                    Value::Builtin(Rc::new(close)),
-                ),
+                ("listen".to_string(), Value::Builtin(Rc::new(listen))),
+                ("write".to_string(), Value::Builtin(Rc::new(write))),
+                ("close".to_string(), Value::Builtin(Rc::new(close))),
             ]);
             return Ok(Value::Collection(fields));
         };
@@ -73,12 +66,7 @@ pub fn socket(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
         Ok(Value::Nil)
     });
 
-    let fields = HashMap::from([
-        (
-            "accept".to_string(),
-            Value::Builtin(Rc::new(accept)),
-        ),
-    ]);
+    let fields = HashMap::from([("accept".to_string(), Value::Builtin(Rc::new(accept)))]);
 
     Ok(Value::Collection(fields))
 }

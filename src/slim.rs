@@ -1,11 +1,10 @@
 use crate::parser;
 use crate::runtime;
-use crate::runtime::RuntimeError;
 use crate::runtime::context::MutRef;
 use crate::runtime::context::RuntimeContext;
+use crate::runtime::RuntimeError;
 use std::fs;
 use std::io::{self, Write};
-
 
 pub fn interactive() -> Result<(), i32> {
     let ctx = get_ctx();
@@ -19,7 +18,7 @@ pub fn interactive() -> Result<(), i32> {
 
         {
             if &input.trim().to_lowercase() == "exit" {
-                break
+                break;
             }
 
             match parser::parse(&input) {
@@ -29,9 +28,7 @@ pub fn interactive() -> Result<(), i32> {
                         _ => runtime::eval(ast, ctx.mut_ref()),
                     };
                     match r {
-                        Err(RuntimeError(e)) => {
-                            handle_runtime_err("".to_string(), " ", e)
-                        },
+                        Err(RuntimeError(e)) => handle_runtime_err("".to_string(), " ", e),
                         _ => {}
                     }
                 }
@@ -54,10 +51,10 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
 
     loop {
         if [""].contains(&input.trim()) {
-            break
+            break;
         };
 
-        match parser::parse(&input) {
+        match parser::parse(input) {
             Ok((i, ast)) => {
                 input = i;
                 if let Err(RuntimeError(e)) = runtime::eval(ast, ctx.mut_ref()) {
@@ -67,11 +64,11 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
             }
             Err(nom::Err::Error(e)) => {
                 handle_parse_err(p, e);
-                return Err(1)
-            },
+                return Err(1);
+            }
             e => {
                 eprintln!("[ParseError]: {:?}", e);
-                return Err(2)
+                return Err(2);
             }
         };
     }
@@ -106,12 +103,13 @@ fn find_error_on_string(main_text: &str, substring: &str) -> Option<(usize, usiz
 fn handle_runtime_err(p: String, remaining: &str, e: String) {
     if let Some((line, col)) = find_error_on_string(&p, remaining) {
         let fail_line = p.lines().collect::<Vec<&str>>()[line - 1];
-        let mut indicator: String = std::iter::repeat(' ')
-        .take(col - 1)
-        .collect();
+        let mut indicator: String = " ".repeat(col - 1);
 
-        indicator.push_str("^");
-        eprintln!("{}", &format!("line: {}\n\t{}\n\t{}", line, fail_line, indicator))
+        indicator.push('^');
+        eprintln!(
+            "{}",
+            &format!("line: {}\n\t{}\n\t{}", line, fail_line, indicator)
+        )
     };
     eprintln!("[RuntimeError]: {}", e);
 }
@@ -119,12 +117,13 @@ fn handle_runtime_err(p: String, remaining: &str, e: String) {
 fn handle_parse_err(p: String, e: nom::error::Error<&str>) {
     if let Some((line, col)) = find_error_on_string(&p, e.input) {
         let fail_line = p.lines().collect::<Vec<&str>>()[line - 1];
-        let mut indicator: String = std::iter::repeat(' ')
-        .take(col - 1)
-        .collect();
+        let mut indicator: String = " ".repeat(col - 1);
 
-        indicator.push_str("^");
-        eprintln!("{}", &format!("line: {}\n\t{}\n\t{}", line, fail_line, indicator))
+        indicator.push('^');
+        eprintln!(
+            "{}",
+            &format!("line: {}\n\t{}\n\t{}", line, fail_line, indicator)
+        )
     };
     eprintln!("[ParseError]: Invalid syntax");
 }

@@ -1,17 +1,17 @@
-pub mod context;
 mod builtins;
-mod operations;
+pub mod context;
 mod helpers;
+mod operations;
 
 use crate::parser::Expr;
 use crate::parser::Token;
 
 use std::collections::HashMap;
 
-use context::INSTANCE;
 use context::MutRef;
-use context::RuntimeContext;
 use context::Mutate;
+use context::RuntimeContext;
+use context::INSTANCE;
 use operations::BinOps;
 use operations::UnaryOps;
 
@@ -65,15 +65,15 @@ impl Value {
                     items.push(item.resolve(ctx)?.resolve_inner(ctx)?);
                 }
                 Ok(Value::Sequence(items))
-            },
+            }
             Value::Collection(fields) => {
                 let mut items = HashMap::new();
                 for (key, value) in fields.into_iter() {
                     items.insert(key, value.resolve(ctx)?.resolve_inner(ctx)?);
                 }
                 Ok(Value::Collection(items))
-            },
-            v => Ok(v)
+            }
+            v => Ok(v),
         }
     }
 
@@ -81,9 +81,11 @@ impl Value {
         while let Value::Ref(inner) = &self {
             match inner {
                 InnerReference::Identifier(name) => {
-                    self = ctx.borrow().get_cloned(&name)
+                    self = ctx
+                        .borrow()
+                        .get_cloned(name)
                         .ok_or(RuntimeError(format!("No variable named: {:?}", name)))?;
-                },
+                }
                 InnerReference::Access(name, path) => {
                     self = eval_flattened_access(name.to_owned(), path.to_owned(), ctx)?;
                 }
@@ -106,7 +108,8 @@ impl Value {
             Value::Ref(..) => "ref",
             Value::Continue => "continue",
             Value::Builtin(..) => "builtin",
-        }.to_owned()
+        }
+        .to_owned()
     }
     pub fn to_bool(self) -> bool {
         match self {
@@ -125,7 +128,10 @@ impl Value {
         if let Value::Collection(fields) = self {
             Ok(fields)
         } else {
-            Err(RuntimeError(format!("Error accessing `{}` as a collection", self.type_hint())))
+            Err(RuntimeError(format!(
+                "Error accessing `{}` as a collection",
+                self.type_hint()
+            )))
         }
     }
 
@@ -133,7 +139,10 @@ impl Value {
         if let Value::Sequence(items) = self {
             Ok(items)
         } else {
-            Err(RuntimeError(format!("Error accessing `{}` as a sequence", self.type_hint())))
+            Err(RuntimeError(format!(
+                "Error accessing `{}` as a sequence",
+                self.type_hint()
+            )))
         }
     }
 
@@ -143,25 +152,23 @@ impl Value {
             Value::Collection(fields) => {
                 let mut items = vec![];
                 for (key, v) in fields.iter() {
-                    let v = Value::Collection(
-                        HashMap::from([
-                            ("key".to_string(), Value::StringLiteral(key.clone())),
-                            ("value".to_string(), v.clone())
-                        ])
-                    );
+                    let v = Value::Collection(HashMap::from([
+                        ("key".to_string(), Value::StringLiteral(key.clone())),
+                        ("value".to_string(), v.clone()),
+                    ]));
                     items.push(v);
                 }
                 Ok(items)
-            },
-            Value::StringLiteral(s) => {
-                Ok(
-                    s.clone()
-                    .chars()
-                    .map(|c| Value::StringLiteral(c.to_string()))
-                    .collect()
-                )
-            },
-            _ => Err(RuntimeError(format!("Error trying to iterate on `{}`", self.type_hint())))
+            }
+            Value::StringLiteral(s) => Ok(s
+                .clone()
+                .chars()
+                .map(|c| Value::StringLiteral(c.to_string()))
+                .collect()),
+            _ => Err(RuntimeError(format!(
+                "Error trying to iterate on `{}`",
+                self.type_hint()
+            ))),
         }
     }
 }
@@ -169,7 +176,7 @@ impl Value {
 pub type EResult = Result<Value, RuntimeError>;
 pub type RtResult<T> = Result<T, RuntimeError>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct RuntimeError(pub String);
 
 pub trait PeekInstance {
@@ -274,17 +281,17 @@ fn eval_pipe(parent: Expr, child: Expr, ctx: RuntimeContext) -> EResult {
         Expr::Call { target, args } => {
             _args.extend(args.into_iter());
             *target
-        },
-        _ => {
-            Err(RuntimeError("XFD".into()))?
         }
+        _ => Err(RuntimeError("XFD".into()))?,
     };
 
     eval_call(f, _args, ctx)
 }
 
 fn eval_deref(_ref: Expr, ctx: RuntimeContext) -> EResult {
-    eval(_ref, ctx.mut_ref())?.resolve(&ctx)?.resolve_inner(&ctx)
+    eval(_ref, ctx.mut_ref())?
+        .resolve(&ctx)?
+        .resolve_inner(&ctx)
 }
 
 fn eval_ref(mut _ref: Expr, ctx: RuntimeContext) -> EResult {
@@ -296,8 +303,11 @@ fn eval_ref(mut _ref: Expr, ctx: RuntimeContext) -> EResult {
         Expr::Access { .. } => {
             let (name, path) = get_access_path(_ref, ctx.mut_ref())?;
             Ok(Value::Ref(InnerReference::Access(name, path)))
-        },
-        _ => Err(RuntimeError(format!("Cannot reference immutable data of type <{:?}>", _ref)))
+        }
+        _ => Err(RuntimeError(format!(
+            "Cannot reference immutable data of type <{:?}>",
+            _ref
+        ))),
     }
 }
 
@@ -307,7 +317,7 @@ fn eval_while(pin: Expr, body: Vec<Expr>, ctx: RuntimeContext) -> EResult {
     while eval(pin.clone(), ctx.mut_ref())?.to_bool() {
         last = eval_body(body.clone(), ctx.mut_ref())?;
         if ctx.borrow().has_eval() {
-            return Ok(last)
+            return Ok(last);
         }
 
         match last {
@@ -333,7 +343,7 @@ fn eval_for(pin: Expr, value: Expr, body: Vec<Expr>, ctx: RuntimeContext) -> ERe
 
         last = eval_body(body.clone(), ctx.mut_ref())?;
         if ctx.borrow().has_eval() {
-            return Ok(last)
+            return Ok(last);
         }
         match last {
             Value::Break(v) => return Ok(*v),
@@ -347,7 +357,7 @@ fn eval_loop(body: Vec<Expr>, ctx: RuntimeContext) -> EResult {
     loop {
         let res = eval_body(body.clone(), ctx.mut_ref())?;
         if ctx.borrow().has_eval() {
-            return Ok(Value::Nil)
+            return Ok(Value::Nil);
         }
         match res {
             Value::Break(v) => break Ok(*v),
@@ -370,17 +380,16 @@ fn eval_body(body: Vec<Expr>, ctx: RuntimeContext) -> EResult {
 }
 
 fn eval_branches(branches: Vec<(Expr, Vec<Expr>)>, ctx: RuntimeContext) -> EResult {
-    let mut last = Value::Nil;
     for (cond, body) in branches.into_iter() {
         if eval(cond, ctx.mut_ref())?.to_bool() {
             let res = eval_body(body, ctx.mut_ref())?;
             if ctx.borrow().has_eval() {
-                return Ok(last)
+                return Ok(last);
             }
             return Ok(res);
         }
     }
-    Ok(last)
+    Ok(Value::Nil)
 }
 
 fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
@@ -404,7 +413,13 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
 
     let instance = target.peek_instance();
     let value = eval(target, ctx.mut_ref())?.resolve(&ctx)?;
-    if let Value::Func { name, params, locals, body } = value {
+    if let Value::Func {
+        name,
+        params,
+        locals,
+        body,
+    } = value
+    {
         if params.len() != args.len() {
             Err(RuntimeError(format!(
                 "Error calling function {:?}, expected {:?} params but got {:?} instead",
@@ -423,8 +438,11 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
         for arg in args.into_iter() {
             let param = params.next().unwrap();
             if let Expr::Term(Token::Identifier(n)) = arg {
-                if param != n { // avoid circular resolve
-                    inner_ctx.borrow_mut().set(param, Value::Ref(InnerReference::Identifier(n)));
+                if param != n {
+                    // avoid circular resolve
+                    inner_ctx
+                        .borrow_mut()
+                        .set(param, Value::Ref(InnerReference::Identifier(n)));
                 }
             } else {
                 inner_ctx.borrow_mut().set(param, eval(arg, ctx.mut_ref())?);
@@ -432,7 +450,10 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
         }
 
         if let Some(instance_name) = instance {
-            inner_ctx.borrow_mut().set(INSTANCE.to_owned(), Value::Ref(InnerReference::Identifier(instance_name)));
+            inner_ctx.borrow_mut().set(
+                INSTANCE.to_owned(),
+                Value::Ref(InnerReference::Identifier(instance_name)),
+            );
         }
 
         let exprs = body.into_iter();
@@ -440,7 +461,7 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
         for e in exprs {
             eval(e, inner_ctx.mut_ref())?;
             if inner_ctx.borrow().has_eval() {
-                break
+                break;
             }
         }
 
@@ -450,7 +471,7 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
             .into_iter()
             .map(|a| eval(a, ctx.mut_ref())?.resolve(&ctx))
             .collect::<RtResult<Vec<Value>>>()?;
-            Ok(builtin(&mut args, ctx.mut_ref())?)
+        Ok(builtin(&mut args, ctx.mut_ref())?)
     } else {
         Err(RuntimeError(format!(
             "Cannot call as function -> {:?}",
@@ -460,7 +481,7 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
 }
 
 fn eval_flattened_access(target: String, path: Vec<Value>, ctx: &RuntimeContext) -> EResult {
-    let mut src = ctx.borrow().get_cloned(&target).unwrap().resolve(&ctx)?;
+    let mut src = ctx.borrow().get_cloned(&target).unwrap().resolve(ctx)?;
     for item in path.into_iter() {
         match item {
             Value::Int(i) => {
@@ -471,11 +492,14 @@ fn eval_flattened_access(target: String, path: Vec<Value>, ctx: &RuntimeContext)
             }
             Value::StringLiteral(s) => {
                 let fields = src.as_collection_mut()?;
-                src = fields.entry(s).or_insert(Value::Collection(HashMap::new())).clone();
-            },
+                src = fields
+                    .entry(s)
+                    .or_insert(Value::Collection(HashMap::new()))
+                    .clone();
+            }
             _ => Err(RuntimeError(format!("Cannot access path on: {:?}", src)))?,
         }
-    };
+    }
     Ok(src)
 }
 
@@ -498,7 +522,7 @@ fn eval_access(target: Expr, field: Expr, ctx: RuntimeContext) -> EResult {
                     i, src
                 )))
             }
-        },
+        }
         Value::StringLiteral(name) => {
             if let Value::Collection(fields) = src {
                 match fields.get(&name).cloned() {
@@ -512,8 +536,12 @@ fn eval_access(target: Expr, field: Expr, ctx: RuntimeContext) -> EResult {
                     src.type_hint()
                 )))
             }
-        },
-        v => Err(RuntimeError(format!("Cannot use `{}` to access {}", v, src.type_hint())))?
+        }
+        v => Err(RuntimeError(format!(
+            "Cannot use `{}` to access {}",
+            v,
+            src.type_hint()
+        )))?,
     }
 }
 
@@ -628,11 +656,14 @@ fn eval_assign(target: Expr, value: Expr, ctx: RuntimeContext) -> EResult {
     } else if let Expr::Deref(mut _ref) = target {
         while let Expr::Deref(i) = *_ref {
             _ref = i;
-        };
+        }
         let (name, path) = match *_ref {
             Expr::Term(Token::Identifier(inner)) => (inner, vec![]),
             Expr::Access { .. } => get_access_path(*_ref, ctx.mut_ref())?,
-            _ => Err(RuntimeError(format!("Cannot reference immutable data of type <{:?}>", _ref)))?
+            _ => Err(RuntimeError(format!(
+                "Cannot reference immutable data of type <{:?}>",
+                _ref
+            )))?,
         };
         let value = eval(value, ctx.mut_ref())?.resolve(&ctx)?;
         ctx.borrow_mut().mutate(name, path, value)?;
@@ -647,9 +678,10 @@ fn eval_assign(target: Expr, value: Expr, ctx: RuntimeContext) -> EResult {
 
 fn eval_term(token: Token, ctx: RuntimeContext) -> EResult {
     match token {
-        Token::Identifier(name) => ctx.borrow().get_cloned(name.as_ref()).ok_or_else(|| {
-            RuntimeError(format!("No variable named: {:?}", name))
-        }),
+        Token::Identifier(name) => ctx
+            .borrow()
+            .get_cloned(name.as_ref())
+            .ok_or_else(|| RuntimeError(format!("No variable named: {:?}", name))),
         Token::_Self => match ctx.borrow().get_cloned(INSTANCE) {
             Some(inner) => Ok(inner),
             None => Err(RuntimeError("No instance in scope".to_string())),
@@ -670,7 +702,7 @@ fn get_access_path(mut src: Expr, ctx: RuntimeContext) -> RtResult<(String, Vec<
         match *field {
             Expr::Term(Token::Identifier(..)) | Expr::Binary { .. } | Expr::Access { .. } => {
                 path.push(eval(*field, ctx.mut_ref())?)
-            },
+            }
             Expr::Term(Token::Nil) => path.push(Value::Nil),
             Expr::Term(Token::Int(i)) => path.push(Value::Int(i)),
             Expr::Term(Token::StringLiteral(s)) => path.push(Value::StringLiteral(s)),

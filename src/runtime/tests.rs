@@ -1,13 +1,10 @@
-
-
 mod tests {
     use std::collections::HashMap;
 
-    use crate::runtime::{self, EResult};
-    use crate::runtime::Value;
     use crate::runtime::context::MutRef;
-    use crate::{runtime::context::RuntimeContext, parser::parse};
-
+    use crate::runtime::Value;
+    use crate::runtime::{self, EResult};
+    use crate::{parser::parse, runtime::context::RuntimeContext};
 
     fn get_last_eval(mut input: &str) -> EResult {
         let ctx = RuntimeContext::default();
@@ -22,7 +19,7 @@ mod tests {
                     break;
                 }
             };
-        };
+        }
 
         r
     }
@@ -87,7 +84,7 @@ mod tests {
             x
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
@@ -106,7 +103,7 @@ mod tests {
             x
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
@@ -124,8 +121,7 @@ mod tests {
             x
         ";
 
-       let r = get_last_eval(input);
-
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
@@ -158,7 +154,7 @@ mod tests {
             x
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
@@ -177,7 +173,7 @@ mod tests {
             x
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
@@ -198,7 +194,7 @@ mod tests {
             add(x, y)
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(3)));
 
@@ -209,7 +205,7 @@ mod tests {
             add(x, y) * 10
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(30)));
 
@@ -220,7 +216,7 @@ mod tests {
             add(x, y) * 10 + 1
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(31)));
 
@@ -231,7 +227,7 @@ mod tests {
             add(x, y) * 10 + 1
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(31)));
 
@@ -242,7 +238,7 @@ mod tests {
             sequence[0]
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(100)));
 
@@ -253,7 +249,7 @@ mod tests {
             collection.a
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::StringLiteral("Hello".to_string())));
     }
@@ -271,7 +267,7 @@ mod tests {
             r
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(2)));
 
@@ -286,7 +282,7 @@ mod tests {
             r
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(1)));
 
@@ -303,7 +299,7 @@ mod tests {
             r
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(1)));
 
@@ -320,7 +316,7 @@ mod tests {
             r
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::Int(2)));
 
@@ -340,7 +336,7 @@ mod tests {
             r
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(Value::StringLiteral("Hello".to_string())));
     }
@@ -355,7 +351,7 @@ mod tests {
             a
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
@@ -373,7 +369,7 @@ mod tests {
             a
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
@@ -384,7 +380,6 @@ mod tests {
             ]))
         );
 
-
         let input = "
             a = [1, 2, 3]
             b = [&a]
@@ -393,7 +388,7 @@ mod tests {
             a
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
@@ -410,13 +405,13 @@ mod tests {
             b
         ";
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(
             r,
-            Ok(Value::Sequence(vec![
-                Value::Ref(runtime::InnerReference::Identifier("a".to_string()))
-            ]))
+            Ok(Value::Sequence(vec![Value::Ref(
+                runtime::InnerReference::Identifier("a".to_string())
+            )]))
         );
 
         let input = "
@@ -430,13 +425,11 @@ mod tests {
 
         assert_eq!(
             r,
-            Ok(Value::Sequence(
-                vec![Value::Sequence(vec![
-                    Value::Int(1),
-                    Value::Int(2),
-                    Value::Int(3)
-                ])
-            ]))
+            Ok(Value::Sequence(vec![Value::Sequence(vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::Int(3)
+            ])]))
         );
 
         let input = "
@@ -451,11 +444,7 @@ mod tests {
 
         let r = get_last_eval(input);
 
-        assert_eq!(
-            r,
-            Ok(Value::StringLiteral("hola a todos".to_string()))
-        );
-
+        assert_eq!(r, Ok(Value::StringLiteral("hola a todos".to_string())));
 
         // this should do copies of all the objects, so nothing is mutated by ref
         let input = "
@@ -468,13 +457,9 @@ mod tests {
             d.inner
         ";
 
-
         let r = get_last_eval(input);
 
-        assert_eq!(
-            r,
-            Ok(Value::StringLiteral("inner string".to_string()))
-        );
+        assert_eq!(r, Ok(Value::StringLiteral("inner string".to_string())));
     }
 
     #[test]
@@ -489,12 +474,8 @@ mod tests {
 
             collection.get_keys()
        ";
-        
-        let expected = Value::Sequence(vec![
-            Value::Int(1),
-            Value::Int(2),
-            Value::Int(3),
-        ]);
+
+        let expected = Value::Sequence(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
 
         let r = get_last_eval(input);
 
@@ -530,13 +511,9 @@ mod tests {
             array.inner
         ";
 
-        let expected = Value::Sequence(vec![
-            Value::Int(3),
-            Value::Int(2),
-            Value::Int(1),
-        ]);
+        let expected = Value::Sequence(vec![Value::Int(3), Value::Int(2), Value::Int(1)]);
 
-       let r = get_last_eval(input);
+        let r = get_last_eval(input);
 
         assert_eq!(r, Ok(expected));
 
@@ -555,17 +532,13 @@ mod tests {
             array.inner
         ";
 
-        let expected = Value::Sequence(vec![
-            Value::Int(0),
-            Value::Int(1),
-            Value::Int(2),
-        ]);
+        let expected = Value::Sequence(vec![Value::Int(0), Value::Int(1), Value::Int(2)]);
 
         let r = get_last_eval(input);
 
         assert_eq!(r, Ok(expected));
     }
-    
+
     #[test]
     fn test_refs() {
         let input = "
@@ -586,7 +559,7 @@ mod tests {
         ]);
 
         let r = get_last_eval(input);
-        assert_eq!(r, Ok(expected));    
+        assert_eq!(r, Ok(expected));
 
         let input = "
             a = [1, 2, 3]
@@ -597,13 +570,9 @@ mod tests {
             b[2] = 30
 
             a
-        ";        
+        ";
 
-        let expected = Value::Sequence(vec![
-            Value::Int(10),
-            Value::Int(20),
-            Value::Int(30),
-        ]);
+        let expected = Value::Sequence(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
 
         let r = get_last_eval(input);
         assert_eq!(r, Ok(expected));
@@ -619,8 +588,14 @@ mod tests {
         ";
 
         let expected = Value::Collection(HashMap::from([
-            ("greet".to_string(), Value::StringLiteral("Hello".to_string())),
-            ("bye".to_string(), Value::StringLiteral("GoodBye".to_string())),
+            (
+                "greet".to_string(),
+                Value::StringLiteral("Hello".to_string()),
+            ),
+            (
+                "bye".to_string(),
+                Value::StringLiteral("GoodBye".to_string()),
+            ),
         ]));
 
         let r = get_last_eval(input);
@@ -762,8 +737,5 @@ mod tests {
 
         let r = get_last_eval(input);
         assert_eq!(r, Ok(expected));
-
-
     }
-
 }
