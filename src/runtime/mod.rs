@@ -35,6 +35,23 @@ impl Into<(String, Vec<Value>)> for InnerReference {
     }
 }
 
+impl InnerReference {
+    fn from_expr(value: Expr, ctx: RuntimeContext) -> Result<Self, RuntimeError> {
+        match value {
+            Expr::Term(Token::Identifier(name)) => Ok(InnerReference::Identifier(name)),
+            Expr::Access { .. } => {
+                let (name, path) = get_access_path(value, ctx)?;
+                Ok(InnerReference::Access(name, path))
+            }
+            _ => Err(RuntimeError(format!(
+                "Cannot convert {:?} to InnerReference",
+                value
+            ))),
+        }
+    }
+}
+
+
 #[derive(Clone)]
 pub enum Value {
     Nil,
@@ -111,6 +128,7 @@ impl Value {
         }
         .to_owned()
     }
+
     pub fn to_bool(self) -> bool {
         match self {
             Value::Nil => false,
@@ -298,17 +316,7 @@ fn eval_ref(mut _ref: Expr, ctx: RuntimeContext) -> EResult {
     while let Expr::Ref(inner) = _ref {
         _ref = *inner;
     }
-    match _ref {
-        Expr::Term(Token::Identifier(inner)) => Ok(Value::Ref(InnerReference::Identifier(inner))),
-        Expr::Access { .. } => {
-            let (name, path) = get_access_path(_ref, ctx.mut_ref())?;
-            Ok(Value::Ref(InnerReference::Access(name, path)))
-        }
-        _ => Err(RuntimeError(format!(
-            "Cannot reference immutable data of type <{:?}>",
-            _ref
-        ))),
-    }
+    Ok(Value::Ref(InnerReference::from_expr(_ref, ctx)?))
 }
 
 fn eval_while(pin: Expr, body: Vec<Expr>, ctx: RuntimeContext) -> EResult {
@@ -431,12 +439,19 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
 
         let inner_ctx = RuntimeContext::default();
         inner_ctx.borrow_mut().set_parent(ctx.mut_ref());
-        let mut params = params.into_iter();
+
         if let Some(locals) = locals {
             inner_ctx.borrow_mut().set_locals(locals);
         };
-        for arg in args.into_iter() {
+
+        let mut params = params.into_iter();
+        for mut arg in args.into_iter() {
             let param = params.next().unwrap();
+
+            while let Expr::Ref(inner) = arg {
+                arg = *inner;
+            }
+
             if let Expr::Term(Token::Identifier(n)) = arg {
                 if param != n {
                     // avoid circular resolve
@@ -444,6 +459,9 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
                         .borrow_mut()
                         .set(param, Value::Ref(InnerReference::Identifier(n)));
                 }
+            } else if let Expr::Access { .. } = arg {
+                let r = InnerReference::from_expr(arg, ctx.mut_ref())?;
+                inner_ctx.borrow_mut().set(param, Value::Ref(r));
             } else {
                 inner_ctx.borrow_mut().set(param, eval(arg, ctx.mut_ref())?);
             }

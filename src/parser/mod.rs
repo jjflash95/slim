@@ -222,8 +222,8 @@ fn parse_func(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_assignment(input: &str) -> IResult<&str, Expr> {
-    let (mut input, mut left) = alt((parse_mutate, parse_access))(input)?; //access
-    while let Ok((next, (_, _))) = tuple((char('='), peek(not(char('=')))))(input) {
+    let (mut input, mut left) = alt((parse_kw_deref, parse_access))(input)?; //access
+    while let Ok((next, _)) = tuple((char('='), peek(not(char('=')))))(input) {
         let (i, right) = parse(next)?;
         input = i;
         left = Expr::Assign {
@@ -235,7 +235,7 @@ fn parse_assignment(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_collection_assignment(input: &str) -> IResult<&str, Expr> {
-    let (mut input, mut left) = alt((parse_mutate, parse_access))(input)?; //access
+    let (mut input, mut left) = alt((parse_kw_deref, parse_access))(input)?; //access
     while let Ok((next, _)) = char(':')(input) {
         let (i, right) = parse(next)?;
         input = i;
@@ -247,7 +247,7 @@ fn parse_collection_assignment(input: &str) -> IResult<&str, Expr> {
     Ok((input, left))
 }
 
-fn parse_mutate(input: &str) -> IResult<&str, Expr> {
+fn parse_kw_deref(input: &str) -> IResult<&str, Expr> {
     tuple((wrap("deref "), alt((parse_term, parse_access))))(input)
         .map(|(i, (_, o))| (i, Expr::Deref(o.into())))
 }
@@ -271,13 +271,13 @@ fn parse_andor(input: &str) -> IResult<&str, Expr> {
 fn parse_compare(input: &str) -> IResult<&str, Expr> {
     let (mut input, mut left) = parse_add(input)?;
     while let Ok((next, op)) = alt((
-        wrap(">"),
-        wrap("<"),
-        wrap(">="),
         wrap("<="),
+        wrap(">="),
         wrap("=="),
         wrap("!="),
-        wrap("in "), // spaces needed to not match "INstanceof" or "linkedIN"
+        wrap("<"),
+        wrap(">"),
+        wrap("in "), // space needed, otherwise x = 1 index = 2 matches (x = 1 in ... breaks)
     ))(input)
     .map(|(i, o)| (i, Token::from(o)))
     {
