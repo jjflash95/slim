@@ -1,3 +1,4 @@
+use crate::runtime::builtins::BuiltinFunc;
 use crate::runtime::builtins::next_arg;
 use crate::runtime::{context::RuntimeContext, EResult, Value};
 use std::{
@@ -22,7 +23,7 @@ pub fn open(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     let writer = Arc::clone(&file);
     let seeker = Arc::clone(&file);
 
-    let read: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> = Box::new(move |_, _| {
+    let read: BuiltinFunc = Box::new(move |_, _| {
         let mut contents = String::new();
         reader
             .lock()
@@ -32,7 +33,7 @@ pub fn open(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
         Ok(Value::StringLiteral(contents))
     });
 
-    let seek: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> = Box::new(move |args, _| {
+    let seek: BuiltinFunc = Box::new(move |args, _| {
         let bytes: i128 = if let Ok(a) = next_arg(args, "seek") {
             a.try_into()?
         } else {
@@ -46,14 +47,13 @@ pub fn open(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
         Ok(Value::Nil)
     });
 
-    let write: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> =
-        Box::new(move |args, _| {
-            let contents: String = next_arg(args, "Content")?.try_into()?;
-            match writer.lock().unwrap().write_all(contents.as_bytes()) {
-                Ok(_) => Ok(Value::Bool(true)),
-                Err(_) => Ok(Value::Bool(false)),
-            }
-        });
+    let write: BuiltinFunc = Box::new(move |args, _| {
+        let contents: String = next_arg(args, "Content")?.try_into()?;
+        match writer.lock().unwrap().write_all(contents.as_bytes()) {
+            Ok(_) => Ok(Value::Bool(true)),
+            Err(_) => Ok(Value::Bool(false)),
+        }
+    });
 
     Ok(Value::Collection(HashMap::from([
         ("read".to_string(), Value::Builtin(Rc::new(read))),

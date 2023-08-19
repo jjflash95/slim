@@ -7,6 +7,7 @@ use crate::parser::Expr;
 use crate::parser::Token;
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use context::MutRef;
 use context::Mutate;
@@ -62,7 +63,7 @@ pub enum Value {
     StringLiteral(String),
     Collection(HashMap<String, Value>),
     Sequence(Vec<Value>),
-    Builtin(BuiltinFunc),
+    Builtin(Rc<BuiltinFunc>),
     Func {
         name: Option<String>,
         params: Vec<String>,
@@ -101,7 +102,7 @@ impl Value {
                     self = ctx
                         .borrow()
                         .get_cloned(name)
-                        .ok_or(RuntimeError(format!("No variable named: {:?}", name)))?;
+                        .ok_or_else(|| RuntimeError(format!("No variable named: {:?}", name)))?;
                 }
                 InnerReference::Access(name, path) => {
                     self = eval_flattened_access(name.to_owned(), path.to_owned(), ctx)?;
@@ -129,12 +130,12 @@ impl Value {
         .to_owned()
     }
 
-    pub fn to_bool(self) -> bool {
+    pub fn to_bool(&self) -> bool {
         match self {
             Value::Nil => false,
-            Value::Bool(b) => b,
-            Value::Int(n) => n != 0,
-            Value::Float(n) => n != 0.0,
+            Value::Bool(b) => *b,
+            Value::Int(n) => *n != 0,
+            Value::Float(n) => *n != 0.0,
             Value::StringLiteral(s) => !s.is_empty(),
             Value::Collection(fields) => !fields.is_empty(),
             Value::Func { .. } => true,
@@ -164,22 +165,21 @@ impl Value {
         }
     }
 
-    pub fn into_vec(&self) -> RtResult<Vec<Value>> {
+    pub fn into_vec(self) -> RtResult<Vec<Value>> {
         match self {
-            Value::Sequence(items) => Ok(items.clone()),
+            Value::Sequence(items) => Ok(items),
             Value::Collection(fields) => {
                 let mut items = vec![];
-                for (key, v) in fields.iter() {
+                for (key, v) in fields.into_iter() {
                     let v = Value::Collection(HashMap::from([
-                        ("key".to_string(), Value::StringLiteral(key.clone())),
-                        ("value".to_string(), v.clone()),
+                        ("key".to_string(), Value::StringLiteral(key)),
+                        ("value".to_string(), v),
                     ]));
                     items.push(v);
                 }
                 Ok(items)
             }
             Value::StringLiteral(s) => Ok(s
-                .clone()
                 .chars()
                 .map(|c| Value::StringLiteral(c.to_string()))
                 .collect()),
@@ -327,11 +327,9 @@ fn eval_while(pin: Expr, body: Vec<Expr>, ctx: RuntimeContext) -> EResult {
         if ctx.borrow().has_eval() {
             return Ok(last);
         }
-
-        match last {
-            Value::Break(v) => return Ok(*v),
-            _ => {}
-        };
+        if let Value::Break(v) = last {
+            return Ok(*v);
+        }
     }
     Ok(last)
 }
@@ -344,7 +342,7 @@ fn eval_for(pin: Expr, value: Expr, body: Vec<Expr>, ctx: RuntimeContext) -> ERe
         None
     };
     let sequence = eval(value, ctx.mut_ref())?.resolve(&ctx)?;
-    for item in sequence.into_vec()?.into_iter() {
+    for item in sequence.clone().into_vec()?.into_iter() {
         if let Some(ref pin) = pin {
             ctx.borrow_mut().set(pin.to_string(), item.clone());
         }
@@ -353,10 +351,9 @@ fn eval_for(pin: Expr, value: Expr, body: Vec<Expr>, ctx: RuntimeContext) -> ERe
         if ctx.borrow().has_eval() {
             return Ok(last);
         }
-        match last {
-            Value::Break(v) => return Ok(*v),
-            _ => {}
-        };
+        if let Value::Break(v) = last {
+            return Ok(*v);
+        }
     }
     Ok(last)
 }
@@ -367,9 +364,8 @@ fn eval_loop(body: Vec<Expr>, ctx: RuntimeContext) -> EResult {
         if ctx.borrow().has_eval() {
             return Ok(Value::Nil);
         }
-        match res {
-            Value::Break(v) => break Ok(*v),
-            _ => {}
+        if let Value::Break(v) = res {
+            return Ok(*v);
         }
     }
 }
@@ -431,7 +427,7 @@ fn eval_call(target: Expr, args: Vec<Expr>, ctx: RuntimeContext) -> EResult {
         if params.len() != args.len() {
             Err(RuntimeError(format!(
                 "Error calling function {:?}, expected {:?} params but got {:?} instead",
-                name.unwrap_or("<anonymous>".to_owned()),
+                name.unwrap_or_else(|| "<anonymous>".to_owned()),
                 params.len(),
                 args.len()
             )))?;
@@ -512,7 +508,7 @@ fn eval_flattened_access(target: String, path: Vec<Value>, ctx: &RuntimeContext)
                 let fields = src.as_collection_mut()?;
                 src = fields
                     .entry(s)
-                    .or_insert(Value::Collection(HashMap::new()))
+                    .or_insert_with(|| Value::Collection(HashMap::new()))
                     .clone();
             }
             _ => Err(RuntimeError(format!("Cannot access path on: {:?}", src)))?,
@@ -641,7 +637,7 @@ fn eval_func(
         })
         .collect::<RtResult<Vec<String>>>()?;
 
-    let locals = if let Some(_) = ctx.borrow().parent {
+    let locals = if ctx.borrow().parent.is_some() {
         Some(ctx.borrow().get_locals())
     } else {
         None

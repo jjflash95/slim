@@ -27,9 +27,9 @@ pub fn interactive() -> Result<(), i32> {
                         parser::Expr::Term(t) => runtime::eval_materialized_term(t, ctx.mut_ref()),
                         _ => runtime::eval(ast, ctx.mut_ref()),
                     };
-                    match r {
-                        Err(RuntimeError(e)) => handle_runtime_err("".to_string(), " ", e),
-                        _ => {}
+
+                    if let Err(RuntimeError(e)) = r {
+                        handle_runtime_err("".to_string(), " ", e)
                     }
                 }
                 Err(e) => {

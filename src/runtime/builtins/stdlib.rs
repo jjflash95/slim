@@ -60,7 +60,7 @@ pub fn replace(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
 pub fn split(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     let arg = next_arg(args, "string")?;
     let sep: String = next_arg(args, "separator")
-        .unwrap_or(Value::StringLiteral("".to_string()))
+        .unwrap_or_else(|_| Value::StringLiteral("".to_string()))
         .try_into()?;
 
     Ok(match arg {

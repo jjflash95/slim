@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
+use crate::runtime::builtins::BuiltinFunc;
 use crate::runtime::context::RuntimeContext;
 use crate::runtime::{EResult, RuntimeError, Value};
 
@@ -14,7 +15,7 @@ pub fn instant(_: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     let millis_ref = Arc::clone(&shared);
     let secs_ref = Arc::clone(&shared);
 
-    let millis: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> = Box::new(move |_, _| {
+    let millis: BuiltinFunc = Box::new(move |_, _| {
         Ok(Value::Int(
             millis_ref
                 .lock()
@@ -23,7 +24,7 @@ pub fn instant(_: &mut Vec<Value>, _: RuntimeContext) -> EResult {
         ))
     });
 
-    let secs: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> = Box::new(move |_, _| {
+    let secs: BuiltinFunc = Box::new(move |_, _| {
         Ok(Value::Int(
             secs_ref
                 .lock()

@@ -6,6 +6,7 @@ use std::{
     net::TcpListener,
 };
 
+use crate::runtime::builtins::BuiltinFunc;
 use crate::runtime::builtins::next_arg;
 use crate::runtime::context::RuntimeContext;
 use crate::runtime::{EResult, RuntimeError, Value};
@@ -15,26 +16,25 @@ pub fn socket(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     let port: i128 = next_arg(args, "port")?.try_into()?;
     let listener = TcpListener::bind((host.as_str(), port as u16)).unwrap();
 
-    let accept: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> = Box::new(move |_, _| {
+    let accept: BuiltinFunc = Box::new(move |_, _| {
         if let Ok((stream, _)) = listener.accept() {
             let sm = Arc::new(Mutex::new(stream));
             let reader = Arc::clone(&sm);
             let writer = Arc::clone(&sm);
             let closer = Arc::clone(&sm);
-            let listen: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> =
+            let listen: BuiltinFunc =
                 Box::new(move |_, _| {
                     let mut buffer = [0; 1024];
-                    reader.lock().unwrap().read(&mut buffer).unwrap();
+                    reader.lock().unwrap().read_exact(&mut buffer).unwrap();
                     return Ok(Value::StringLiteral(
                         String::from_utf8_lossy(&buffer[..]).into(),
                     ));
                 });
 
-            let write: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> =
-                Box::new(move |args: &mut Vec<Value>, _: RuntimeContext| {
+            let write: BuiltinFunc = Box::new(move |args, _| {
                     let t: String = args.remove(0).try_into()?;
                     let mut buf = t.as_bytes();
-                    while buf != &[] {
+                    while !buf.is_empty() {
                         let res = writer.lock().unwrap().write(buf);
                         match res {
                             Ok(0) => break,
@@ -45,8 +45,7 @@ pub fn socket(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
                     Ok(Value::Nil)
                 });
 
-            let close: Box<dyn Fn(&mut Vec<Value>, RuntimeContext) -> EResult> =
-                Box::new(move |_: &mut Vec<Value>, _: RuntimeContext| {
+            let close: BuiltinFunc = Box::new(move |_, _| {
                     closer
                         .lock()
                         .unwrap()

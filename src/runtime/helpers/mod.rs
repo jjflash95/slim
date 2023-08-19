@@ -1,4 +1,5 @@
 use crate::runtime::{RuntimeError, Value};
+use std::fmt::Write as _;
 use core::fmt;
 
 impl TryInto<i128> for Value {
@@ -108,16 +109,17 @@ fn format(value: &Value, indent: u8) -> String {
     match value {
         Value::Collection(fields) => {
             let mut s = String::new();
-            s.push_str(&format!("{}{{\n", "".repeat(indent as usize)));
+            let _ = writeln!(s, "{}{{", "".repeat(indent as usize));
             for (key, value) in fields {
-                s.push_str(&format!(
-                    "{}  {}: {},\n",
+                let _ = writeln!(
+                    s,
+                    "{}  {}: {}",
                     "  ".repeat(indent as usize),
                     key,
                     format(value, indent + 1)
-                ));
-            }
-            s.push_str(&format!("{}}}", "  ".repeat(indent as usize)));
+                );
+            };
+            let _ = write!(s, "{}}}", "  ".repeat(indent as usize));
             s
         }
         Value::Func { name, params, .. } => {
@@ -135,9 +137,7 @@ fn format(value: &Value, indent: u8) -> String {
                 .collect::<Vec<String>>()
                 .join(", ");
 
-            s.push_str(&format!("{}[", "".repeat(indent as usize)));
-            s.push_str(values);
-            s.push(']');
+            let _ = write!(s, "{}[{}]", "".repeat(indent as usize), values);
             s
         }
         Value::Bool(b) => format!("{}", b),
