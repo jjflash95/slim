@@ -6,8 +6,8 @@ use std::{
     net::TcpListener,
 };
 
-use crate::runtime::builtins::BuiltinFunc;
 use crate::runtime::builtins::next_arg;
+use crate::runtime::builtins::BuiltinFunc;
 use crate::runtime::context::RuntimeContext;
 use crate::runtime::{EResult, RuntimeError, Value};
 
@@ -22,37 +22,36 @@ pub fn socket(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
             let reader = Arc::clone(&sm);
             let writer = Arc::clone(&sm);
             let closer = Arc::clone(&sm);
-            let listen: BuiltinFunc =
-                Box::new(move |_, _| {
-                    let mut buffer = [0; 1024];
-                    reader.lock().unwrap().read_exact(&mut buffer).unwrap();
-                    return Ok(Value::StringLiteral(
-                        String::from_utf8_lossy(&buffer[..]).into(),
-                    ));
-                });
+            let listen: BuiltinFunc = Box::new(move |_, _| {
+                let mut buffer = [0; 1024];
+                reader.lock().unwrap().read_exact(&mut buffer).unwrap();
+                return Ok(Value::StringLiteral(
+                    String::from_utf8_lossy(&buffer[..]).into(),
+                ));
+            });
 
             let write: BuiltinFunc = Box::new(move |args, _| {
-                    let t: String = args.remove(0).try_into()?;
-                    let mut buf = t.as_bytes();
-                    while !buf.is_empty() {
-                        let res = writer.lock().unwrap().write(buf);
-                        match res {
-                            Ok(0) => break,
-                            Ok(n) => buf = &buf[n..],
-                            Err(_) => return Err(RuntimeError("Failed socket.write".to_owned())),
-                        };
-                    }
-                    Ok(Value::Nil)
-                });
+                let t: String = args.remove(0).try_into()?;
+                let mut buf = t.as_bytes();
+                while !buf.is_empty() {
+                    let res = writer.lock().unwrap().write(buf);
+                    match res {
+                        Ok(0) => break,
+                        Ok(n) => buf = &buf[n..],
+                        Err(_) => return Err(RuntimeError("Failed socket.write".to_owned())),
+                    };
+                }
+                Ok(Value::Nil)
+            });
 
             let close: BuiltinFunc = Box::new(move |_, _| {
-                    closer
-                        .lock()
-                        .unwrap()
-                        .shutdown(std::net::Shutdown::Both)
-                        .unwrap();
-                    Ok(Value::Nil)
-                });
+                closer
+                    .lock()
+                    .unwrap()
+                    .shutdown(std::net::Shutdown::Both)
+                    .unwrap();
+                Ok(Value::Nil)
+            });
 
             let fields = HashMap::from([
                 ("listen".to_string(), Value::Builtin(Rc::new(listen))),

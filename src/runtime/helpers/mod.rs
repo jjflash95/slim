@@ -1,6 +1,6 @@
 use crate::runtime::{RuntimeError, Value};
-use std::fmt::Write as _;
 use core::fmt;
+use std::fmt::Write as _;
 
 impl TryInto<i128> for Value {
     type Error = RuntimeError;
@@ -118,7 +118,7 @@ fn format(value: &Value, indent: u8) -> String {
                     key,
                     format(value, indent + 1)
                 );
-            };
+            }
             let _ = write!(s, "{}}}", "  ".repeat(indent as usize));
             s
         }

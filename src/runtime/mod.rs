@@ -52,7 +52,6 @@ impl InnerReference {
     }
 }
 
-
 #[derive(Clone)]
 pub enum Value {
     Nil,

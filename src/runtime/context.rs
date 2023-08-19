@@ -168,7 +168,9 @@ impl Mutate for Context {
                         };
 
                         let fields = src.as_collection_mut()?;
-                        src = fields.entry(s).or_insert_with(|| Value::Collection(HashMap::new()));
+                        src = fields
+                            .entry(s)
+                            .or_insert_with(|| Value::Collection(HashMap::new()));
                         if path.is_empty() {
                             *src = value;
                             return Ok(Value::Nil);
