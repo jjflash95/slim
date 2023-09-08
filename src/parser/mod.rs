@@ -94,7 +94,7 @@ pub enum Expr {
     },
     Trait {
         name: Token,
-        methods: Vec<Expr>
+        methods: Vec<Expr>,
     },
     Impl {
         name: Token,
@@ -150,7 +150,16 @@ impl From<&str> for Token {
 }
 
 pub fn parse(input: &str) -> IResult<&str, Expr> {
-    alt((parse_trait, parse_impl, parse_for, parse_if, parse_while, parse_loop, parse_scope, parse_pipe))(input.trim_start())
+    alt((
+        parse_trait,
+        parse_impl,
+        parse_for,
+        parse_if,
+        parse_while,
+        parse_loop,
+        parse_scope,
+        parse_pipe,
+    ))(input.trim_start())
 }
 
 fn body() -> impl Fn(&str) -> IResult<&str, Vec<Expr>> {
@@ -171,12 +180,16 @@ fn parse_impl(input: &str) -> IResult<&str, Expr> {
         wrap("impl"),
         _parse_identifier,
         wrap("for"),
-        _parse_identifier
-    ))(input).map(|(i, (_, t, _, s))| {
-        (i, Expr::Impl {
-            name: Token::Identifier(t.into()),
-            target: Token::Identifier(s.into())
-        })
+        _parse_identifier,
+    ))(input)
+    .map(|(i, (_, t, _, s))| {
+        (
+            i,
+            Expr::Impl {
+                name: Token::Identifier(t.into()),
+                target: Token::Identifier(s.into()),
+            },
+        )
     })
 }
 
@@ -187,8 +200,9 @@ fn parse_trait(input: &str) -> IResult<&str, Expr> {
         wrap("{"),
         many0(parse_func),
         opt(wrap(",")),
-        wrap("}")
-    ))(input).map(|(i, (_, name, _, methods, _, _))| {
+        wrap("}"),
+    ))(input)
+    .map(|(i, (_, name, _, methods, _, _))| {
         (
             i,
             Expr::Trait {
@@ -430,8 +444,8 @@ fn parse_access(input: &str) -> IResult<&str, Expr> {
                 }
             }
             Some('[') => {
-                let (i, right) =
-                delimited(skippables, parse, skippables)(&input[1..]).unwrap_or((&input[1..], Expr::Term(Token::Nil)));
+                let (i, right) = delimited(skippables, parse, skippables)(&input[1..])
+                    .unwrap_or((&input[1..], Expr::Term(Token::Nil)));
                 input = char(']')(i)?.0;
                 left = Expr::Access {
                     target: Box::new(left),
@@ -445,17 +459,18 @@ fn parse_access(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_inc_dec(input: &str) -> IResult<&str, Expr> {
-    tuple((
-        parse_identifier,
-        alt((wrap("++"), wrap("--")))
-    ))(input).map(|(i, (id, o))| {
-        (i, Expr::Assign {
-            target: id.clone().into(),
-            value: Expr::Binary {
-                op: if o == "++" { Token::Add } else { Token::Sub },
-                left: id.into(),
-                right: Expr::Term(Token::Int(1)).into() }.into()
-            }
+    tuple((parse_identifier, alt((wrap("++"), wrap("--")))))(input).map(|(i, (id, o))| {
+        (
+            i,
+            Expr::Assign {
+                target: id.clone().into(),
+                value: Expr::Binary {
+                    op: if o == "++" { Token::Add } else { Token::Sub },
+                    left: id.into(),
+                    right: Expr::Term(Token::Int(1)).into(),
+                }
+                .into(),
+            },
         )
     })
 }
@@ -525,8 +540,7 @@ fn _parse_identifier(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_identifier(input: &str) -> IResult<&str, Expr> {
-    _parse_identifier(input)
-        .map(|(i, o)| (i, Expr::Term(o.into())))
+    _parse_identifier(input).map(|(i, o)| (i, Expr::Term(o.into())))
 }
 
 fn parse_sequence(input: &str) -> IResult<&str, Expr> {

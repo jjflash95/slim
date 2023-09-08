@@ -2,8 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 
 use crate::runtime::object::ObjectRef;
 
-use super::object::{TraitDef, Type, TraitImpl};
-
+use super::object::{TraitDef, TraitImpl, Type};
 
 #[derive(Debug, Default)]
 pub struct Scope {
@@ -21,16 +20,16 @@ impl Scope {
 
     fn get_parent(&mut self) -> Option<&mut Scope> {
         if let Some(parent) = self.parent {
-            return Some(unsafe { &mut *parent })
+            return Some(unsafe { &mut *parent });
         }
         None
     }
 
     pub fn get(&mut self, key: &str) -> Option<ObjectRef> {
         if let Some(v) = self.store.get(key) {
-            return Some(Rc::clone(v))
+            return Some(Rc::clone(v));
         } else if let Some(parent) = self.get_parent() {
-            return parent.get(key)
+            return parent.get(key);
         }
         None
     }
@@ -42,9 +41,9 @@ impl Scope {
 
     pub fn get_trait_impl(&mut self, _type: Type) -> Option<TraitImpl> {
         if let Some(v) = self.trait_impls.get(&_type) {
-            return Some(v.clone())
+            return Some(v.clone());
         } else if let Some(parent) = self.get_parent() {
-            return parent.get_trait_impl(_type)
+            return parent.get_trait_impl(_type);
         }
         None
     }
@@ -55,7 +54,7 @@ impl Scope {
 
     pub fn locals(&self) -> Option<HashMap<String, ObjectRef>> {
         if self.parent.is_some() {
-            return Some(self.store.clone())
+            return Some(self.store.clone());
         }
         None
     }

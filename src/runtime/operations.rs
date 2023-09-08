@@ -1,12 +1,11 @@
 use crate::parser::Token;
 use crate::rt_err;
 use crate::runtime::EResult;
-use crate::runtime::RuntimeError;
 use crate::runtime::Object;
+use crate::runtime::RuntimeError;
 
 use super::object::ObjectRef;
 use super::object::Ord;
-
 
 pub trait BinOps {
     fn binary(self, op: Token, other: Self) -> EResult<Object>;
@@ -56,7 +55,7 @@ impl UnaryOps for Object {
     }
 
     fn not(self) -> EResult<Object> {
-        Ok(Object::Bool(true))//(!self.to_bool()))
+        Ok(Object::Bool(true)) //(!self.to_bool()))
     }
 }
 
@@ -187,8 +186,7 @@ impl BinOps for Object {
             )),
             _ => Err(RuntimeError(format!(
                 "Cannot check if <{:?}> contains <{:?}>",
-                self,
-                other
+                self, other
             ))),
         }
     }
@@ -249,8 +247,7 @@ impl Helpers for Object {
             )),
             _ => Err(RuntimeError(format!(
                 "Cannot merge {:?} to {:?}",
-                self,
-                other
+                self, other
             ))),
         }
     }
@@ -260,10 +257,7 @@ impl Helpers for Object {
             Object::Str(s) => Ok(Object::Int(s.len() as i128)),
             Object::Sequence(values) => Ok(Object::Int(values.len() as i128)),
             Object::Collection(fields) => Ok(Object::Int(fields.len() as i128)),
-            v => Err(RuntimeError(format!(
-                "Cannot get len of: <{:?}>",
-                v
-            ))),
+            v => Err(RuntimeError(format!("Cannot get len of: <{:?}>", v))),
         }
     }
 }

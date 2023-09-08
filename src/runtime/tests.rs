@@ -1,11 +1,11 @@
 mod tests {
     use std::collections::HashMap;
 
-    use crate::runtime::Object;
+    use crate::parser::parse;
     use crate::runtime::object::ToObject;
     use crate::runtime::scope::Scope;
+    use crate::runtime::Object;
     use crate::runtime::{self};
-    use crate::{parser::parse};
 
     fn get_last_eval(mut input: &str) -> Object {
         let mut ctx = Scope::default();
@@ -76,7 +76,8 @@ mod tests {
                 Object::Int(1).into(),
                 Object::Int(2).into(),
                 Object::Int(3).into()
-        ]));
+            ])
+        );
 
         let input = "
             x = [1, 2, 3]
@@ -92,7 +93,8 @@ mod tests {
                 Object::Int(100).into(),
                 Object::Int(2).into(),
                 Object::Int(3).into()
-        ]));
+            ])
+        );
 
         let input = "
             x = [1, 2, 3]
@@ -110,7 +112,8 @@ mod tests {
                 Object::Int(100).into(),
                 Object::Int(200).into(),
                 Object::Int(300).into()
-        ]));
+            ])
+        );
 
         let input = "
             x = [1, 2, 3]
@@ -127,7 +130,8 @@ mod tests {
                 Object::Int(1).into(),
                 Object::Int(999).into(),
                 Object::Int(3).into()
-        ]));
+            ])
+        );
     }
 
     #[test]
@@ -142,7 +146,8 @@ mod tests {
                 ("a".to_string(), Object::Int(1).into()),
                 ("b".to_string(), Object::Int(2).into()),
                 ("c".to_string(), Object::Int(3).into())
-        ])));
+            ]))
+        );
 
         let input = "
             x = {a: 1, b: 2, c: 3}
@@ -158,7 +163,8 @@ mod tests {
                 ("a".to_string(), Object::Int(100).into()),
                 ("b".to_string(), Object::Int(2).into()),
                 ("c".to_string(), Object::Int(3).into())
-        ])));
+            ]))
+        );
 
         let input = "
             x = {a: 1, b: 2, c: 3}
@@ -385,7 +391,11 @@ mod tests {
             a
         ";
 
-        let expected = Object::Sequence(vec![Object::Int(10).into(), Object::Int(20).into(), Object::Int(30).into()]);
+        let expected = Object::Sequence(vec![
+            Object::Int(10).into(),
+            Object::Int(20).into(),
+            Object::Int(30).into(),
+        ]);
 
         let r = get_last_eval(input);
         assert_eq!(r, expected);
@@ -401,14 +411,8 @@ mod tests {
         ";
 
         let expected = Object::Collection(HashMap::from([
-            (
-                "greet".to_string(),
-                Object::Str("Hello".to_string()).into(),
-            ),
-            (
-                "bye".to_string(),
-                Object::Str("GoodBye".to_string()).into(),
-            ),
+            ("greet".to_string(), Object::Str("Hello".to_string()).into()),
+            ("bye".to_string(), Object::Str("GoodBye".to_string()).into()),
         ]));
 
         let r = get_last_eval(input);
@@ -538,14 +542,16 @@ mod tests {
                 Object::Str("l".to_string()).into(),
                 Object::Str("l".to_string()).into(),
                 Object::Str("o".to_string()).into(),
-            ]).into(),
+            ])
+            .into(),
             Object::Sequence(vec![
                 Object::Str("W".to_string()).into(),
                 Object::Str("o".to_string()).into(),
                 Object::Str("r".to_string()).into(),
                 Object::Str("l".to_string()).into(),
                 Object::Str("d".to_string()).into(),
-            ]).into(),
+            ])
+            .into(),
         ]);
 
         let r = get_last_eval(input);

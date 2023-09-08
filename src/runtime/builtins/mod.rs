@@ -1,20 +1,25 @@
-use std::time::SystemTime;
-use std::{collections::HashMap, rc::Rc, io::Write};
 use std::cell::RefCell;
+use std::time::SystemTime;
+use std::{collections::HashMap, io::Write, rc::Rc};
 
-use crate::{rt_err, runtime::RuntimeError, nil};
+use crate::{nil, rt_err, runtime::RuntimeError};
 
 use super::object::ToObject;
-use super::{scope::Scope, object::{ObjectRef, Object, BuiltinPtr, BuiltinFunc}, EResult};
-
+use super::{
+    object::{BuiltinFunc, BuiltinPtr, Object, ObjectRef},
+    scope::Scope,
+    EResult,
+};
 
 fn pop(_: &mut Scope, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     if args.len() != 1 {
-        return rt_err!("pop takes 1 argument")
+        return rt_err!("pop takes 1 argument");
     }
     let mut arg = args[0].borrow_mut();
     if let Object::Sequence(s) = &mut *arg {
-        return s.pop().ok_or(RuntimeError("Cannot pop from empty sequence".into()));
+        return s
+            .pop()
+            .ok_or(RuntimeError("Cannot pop from empty sequence".into()));
     }
     rt_err!("pop takes a sequence")
 }
@@ -61,13 +66,11 @@ pub fn slice(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     let start: i128 = next_arg(&mut args, "start")?.object().try_into()?;
     let end: i128 = next_arg(&mut args, "end")?.object().try_into()?;
     match iterable {
-        Object::Sequence(seq) => Ok(Object::Sequence(seq[start as usize..end as usize].into()).into()),
-        Object::Str(s) => Ok(Object::Str(
-            s[start as usize..end as usize].to_string(),
-        ).into()),
-        _ => rt_err!(
-            "Slice needs a sequence or string as first argument"
-        ),
+        Object::Sequence(seq) => {
+            Ok(Object::Sequence(seq[start as usize..end as usize].into()).into())
+        }
+        Object::Str(s) => Ok(Object::Str(s[start as usize..end as usize].to_string()).into()),
+        _ => rt_err!("Slice needs a sequence or string as first argument"),
     }
 }
 
@@ -153,7 +156,7 @@ fn get_builtins() -> Vec<(&'static str, BuiltinPtr)> {
         ("clear", clear),
         ("dbg", dbg),
         ("print", print),
-        ("pop", pop)
+        ("pop", pop),
     ]
 }
 

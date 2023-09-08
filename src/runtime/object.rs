@@ -1,14 +1,12 @@
 use core::fmt;
 use std::fmt::Write;
-use std::{cell::RefCell, rc::Rc, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::rt_err;
 use crate::parser::{Expr, Token};
+use crate::rt_err;
+use crate::runtime::scope::Scope;
 use crate::runtime::EResult;
 use crate::runtime::RuntimeError;
-use crate::runtime::scope::Scope;
-
-
 
 #[derive(Clone)]
 pub struct BuiltinFunc(pub BuiltinPtr);
@@ -18,7 +16,6 @@ pub type ObjectRef = Rc<RefCell<Object>>;
 pub type Ord = std::cmp::Ordering;
 
 pub type TraitImpl = HashMap<String, ObjectRef>;
-
 
 #[derive(Clone, Debug)]
 pub struct TraitDef {
@@ -67,53 +64,64 @@ impl PartialEq for Object {
             (Object::Str(a), Object::Str(b)) => a == b,
             (Object::Collection(a), Object::Collection(b)) => a == b,
             (Object::Sequence(a), Object::Sequence(b)) => a == b,
-            (Object::Builtin(a), Object::Builtin(b)) => std::ptr::addr_of!(a) == std::ptr::addr_of!(b),
-            (Object::Func {..}, Object::Func {..}) => { self == other },
+            (Object::Builtin(a), Object::Builtin(b)) => {
+                std::ptr::addr_of!(a) == std::ptr::addr_of!(b)
+            }
+            (Object::Func { .. }, Object::Func { .. }) => self == other,
             _ => false,
         }
     }
 }
 
-
 impl PartialOrd for Object {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
             (Object::Nil, Object::Nil) => Some(std::cmp::Ordering::Equal),
-            (Object::Bool(a), Object::Bool(b)) => if a == b {
-                Some(Ord::Equal)
-            } else if a == &true {
-                Some(Ord::Greater)
-            } else {
-                Some(Ord::Less)
-            },
-            (Object::Int(a), Object::Int(b)) => if a == b {
-                Some(Ord::Equal)
-            } else if a > b{
-                Some(Ord::Greater)
-            } else {
-                Some(Ord::Less)
-            },
-            (Object::Float(a), Object::Float(b)) => if a == b {
-                Some(Ord::Equal)
-            } else if a > b {
-                Some(Ord::Greater)
-            } else {
-                Some(Ord::Less)
-            },
-            (Object::Str(a), Object::Str(b)) => if a == b {
-                Some(Ord::Equal)
-            } else if a > b {
-                Some(Ord::Greater)
-            } else {
-                Some(Ord::Less)
-            },
-            (Object::Sequence(a), Object::Sequence(b)) => if a == b {
-                Some(Ord::Equal)
-            } else if a > b {
-                Some(Ord::Greater)
-            } else {
-                Some(Ord::Less)
-            },
+            (Object::Bool(a), Object::Bool(b)) => {
+                if a == b {
+                    Some(Ord::Equal)
+                } else if a == &true {
+                    Some(Ord::Greater)
+                } else {
+                    Some(Ord::Less)
+                }
+            }
+            (Object::Int(a), Object::Int(b)) => {
+                if a == b {
+                    Some(Ord::Equal)
+                } else if a > b {
+                    Some(Ord::Greater)
+                } else {
+                    Some(Ord::Less)
+                }
+            }
+            (Object::Float(a), Object::Float(b)) => {
+                if a == b {
+                    Some(Ord::Equal)
+                } else if a > b {
+                    Some(Ord::Greater)
+                } else {
+                    Some(Ord::Less)
+                }
+            }
+            (Object::Str(a), Object::Str(b)) => {
+                if a == b {
+                    Some(Ord::Equal)
+                } else if a > b {
+                    Some(Ord::Greater)
+                } else {
+                    Some(Ord::Less)
+                }
+            }
+            (Object::Sequence(a), Object::Sequence(b)) => {
+                if a == b {
+                    Some(Ord::Equal)
+                } else if a > b {
+                    Some(Ord::Greater)
+                } else {
+                    Some(Ord::Less)
+                }
+            }
             _ => None,
         }
     }
@@ -159,10 +167,16 @@ impl Object {
 
     pub fn get_trait(&mut self, scope: &mut Scope, field: ObjectRef) -> EResult<ObjectRef> {
         if let Object::Str(name) = field.borrow().clone() {
-            let traits = scope.get_trait_impl(self._type()).ok_or(
-                RuntimeError(format!("type {:?} has no traits", self._type()
-            )))?;
-            traits.get(&name).cloned().ok_or(RuntimeError("did not found trait".into()))
+            let traits = scope
+                .get_trait_impl(self._type())
+                .ok_or(RuntimeError(format!(
+                    "type {:?} has no traits",
+                    self._type()
+                )))?;
+            traits
+                .get(&name)
+                .cloned()
+                .ok_or(RuntimeError("did not found trait".into()))
         } else {
             rt_err!("type {:?} has no field {:?}", self._type(), field)
         }
@@ -171,7 +185,8 @@ impl Object {
     pub fn into_vec(self) -> EResult<Vec<ObjectRef>> {
         match self {
             Object::Sequence(items) => Ok(items),
-            Object::Str(s) => Ok(s.chars()
+            Object::Str(s) => Ok(s
+                .chars()
                 .map(|c| Object::Str(c.to_string()).into())
                 .collect()),
             _ => rt_err!("Cannot convert {:?} to vec", self),
@@ -194,32 +209,30 @@ impl Object {
 
     pub fn access(&mut self, field: Object) -> EResult<ObjectRef> {
         match self {
-            Object::Sequence(items) => {
-                match field {
-                    Object::Int(index) => {
-                        let item = items.get(index as usize)
-                            .ok_or_else(|| RuntimeError(format!("No index: {}", index)))?;
-                        return Ok(Rc::clone(item))
-                    },
-                    Object::Nil => {
-                        let next = Rc::new(RefCell::new(Object::Nil));
-                        items.push(next.clone());
-                        return Ok(next)
-                    }
-                    _ => {},
+            Object::Sequence(items) => match field {
+                Object::Int(index) => {
+                    let item = items
+                        .get(index as usize)
+                        .ok_or_else(|| RuntimeError(format!("No index: {}", index)))?;
+                    return Ok(Rc::clone(item));
                 }
-            },
-            Object::Collection(fields) => {
-                match field {
-                    Object::Str(key) => {
-                        let item = fields.get(&key)
-                            .ok_or_else(|| RuntimeError(format!("No field named: {}", key)))?;
-                        return Ok(Rc::clone(item))
-                    },
-                    _ => {},
+                Object::Nil => {
+                    let next = Rc::new(RefCell::new(Object::Nil));
+                    items.push(next.clone());
+                    return Ok(next);
                 }
+                _ => {}
             },
-            _ => {},
+            Object::Collection(fields) => match field {
+                Object::Str(key) => {
+                    let item = fields
+                        .get(&key)
+                        .ok_or_else(|| RuntimeError(format!("No field named: {}", key)))?;
+                    return Ok(Rc::clone(item));
+                }
+                _ => {}
+            },
+            _ => {}
         };
 
         rt_err!("cannot access : {:?} with {:?}", self, field)
@@ -245,7 +258,10 @@ impl Object {
             Object::Func { name, params, .. } => {
                 format!(
                     "[func]{}({})",
-                    &name.as_ref().map(|s| format!(" {} ", s)).unwrap_or("".to_string()),
+                    &name
+                        .as_ref()
+                        .map(|s| format!(" {} ", s))
+                        .unwrap_or("".to_string()),
                     params.join(",")
                 )
             }
@@ -271,13 +287,11 @@ impl Object {
     }
 }
 
-
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.format(0))
     }
 }
-
 
 pub type BuiltinPtr = fn(&mut Scope, Vec<ObjectRef>) -> EResult<ObjectRef>;
 

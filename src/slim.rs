@@ -1,8 +1,8 @@
 use crate::parser;
 use crate::runtime;
-use crate::runtime::RuntimeError;
-use crate::runtime::scope::Scope;
 use crate::runtime::builtins;
+use crate::runtime::scope::Scope;
+use crate::runtime::RuntimeError;
 use std::fs;
 use std::io::{self, Write};
 
