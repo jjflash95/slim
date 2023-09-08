@@ -23,10 +23,7 @@ pub fn interactive() -> Result<(), i32> {
 
             match parser::parse(&input) {
                 Ok((_, ast)) => {
-                    let r = match ast {
-                        // parser::Expr::Term(t) => runtime::eval_materialized_term(t, ctx.mut_ref()),
-                        _ => runtime::evaluate(&mut scope, ast),
-                    };
+                    let r = runtime::evaluate(&mut scope, ast);
 
                     if let Err(RuntimeError(e)) = r {
                         handle_runtime_err("".to_string(), " ", e)

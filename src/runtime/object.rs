@@ -154,7 +154,7 @@ impl Object {
             Object::Sequence(..) => Type::Sequence,
             Object::Builtin(..) => Type::Builtin,
             Object::Func { .. } => Type::Func,
-        }.into()
+        }
     }
 
     pub fn get_trait(&mut self, scope: &mut Scope, field: ObjectRef) -> EResult<ObjectRef> {
@@ -252,7 +252,7 @@ impl Object {
             Object::Sequence(values) => {
                 let mut s = String::new();
                 let values = &values
-                    .into_iter()
+                    .iter()
                     .map(|v| v.borrow().format(indent + 1))
                     .collect::<Vec<String>>()
                     .join(", ");

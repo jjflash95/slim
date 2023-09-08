@@ -37,7 +37,7 @@ macro_rules! rt_err {
     };
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Interrupts {
     Return,
     Break,
@@ -243,7 +243,7 @@ fn eval_for_with(
     let sequence = evaluate(scope, iterable)?;
     for item in sequence.object().into_vec()?.into_iter() {
         if let Expr::Term(Token::Identifier(ref name)) = pin {
-            scope.set(&name, item);
+            scope.set(name, item);
         }
 
         for expr in body.clone() {
@@ -537,7 +537,7 @@ fn eval_assign(scope: &mut Scope, target: Expr, value: Expr) -> EResult<ObjectRe
                     nil!()
                 },
                 Expr::Term(Token::_Self) => {
-                    let prev = scope.get("self").ok_or_else(|| RuntimeError(format!("No self in scope")))?;
+                    let prev = scope.get("self").ok_or_else(|| RuntimeError("No self in scope".to_string()))?;
                     prev.replace(oref.object());
                     nil!()
                 },
@@ -583,7 +583,7 @@ fn eval_access(scope: &mut Scope, target: Expr, field: Expr) -> EResult<ObjectRe
     } else {
         let t = src.get_trait(scope, field)?;
         if let Object::Func { name, params, locals, body } = &*t.borrow() {
-            let mut locals = locals.clone().unwrap_or(HashMap::new());
+            let mut locals = locals.clone().unwrap_or_default();
             locals.insert("self".into(), Rc::clone(&target));
             return Ok(Object::Func {
                 name: name.clone(), 

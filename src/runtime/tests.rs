@@ -4,7 +4,7 @@ mod tests {
     use crate::runtime::Object;
     use crate::runtime::object::ToObject;
     use crate::runtime::scope::Scope;
-    use crate::runtime::{self, EResult};
+    use crate::runtime::{self};
     use crate::{parser::parse};
 
     fn get_last_eval(mut input: &str) -> Object {
