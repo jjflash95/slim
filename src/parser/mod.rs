@@ -36,6 +36,12 @@ pub enum Token {
     StringLiteral(String),
     Float(f64),
     Int(i128),
+    TypeInt,
+    TypeStr,
+    TypeSeq,
+    TypeColl,
+    TypeBool,
+    TypeStruct,
     _Self,
 }
 
@@ -56,7 +62,7 @@ pub enum Expr {
     },
     Func {
         name: Option<String>,
-        args: Vec<Expr>,
+        params: Vec<Expr>,
         body: Vec<Expr>,
     },
     Call {
@@ -73,7 +79,7 @@ pub enum Expr {
     },
     For {
         pin: Box<Expr>,
-        value: Box<Expr>,
+        iterable: Box<Expr>,
         body: Vec<Expr>,
     },
     While {
@@ -86,11 +92,21 @@ pub enum Expr {
     Conditional {
         branches: Vec<(Expr, Vec<Expr>)>,
     },
+    Trait {
+        name: Token,
+        methods: Vec<Expr>
+    },
+    Impl {
+        name: Token,
+        target: Token,
+    },
+    Struct(Vec<Expr>),
     Term(Token),
     Return(Box<Expr>),
     Break(Box<Expr>),
     Deref(Box<Expr>),
     Ref(Box<Expr>),
+    Scope(Vec<Expr>),
     Sequence(Vec<Expr>),
     Collection(Vec<Expr>),
     Continue,
@@ -134,7 +150,7 @@ impl From<&str> for Token {
 }
 
 pub fn parse(input: &str) -> IResult<&str, Expr> {
-    alt((parse_for, parse_if, parse_while, parse_loop, parse_pipe))(input.trim_start())
+    alt((parse_trait, parse_impl, parse_for, parse_if, parse_while, parse_loop, parse_scope, parse_pipe))(input.trim_start())
 }
 
 fn body() -> impl Fn(&str) -> IResult<&str, Vec<Expr>> {
@@ -148,6 +164,43 @@ fn body() -> impl Fn(&str) -> IResult<&str, Vec<Expr>> {
             },
         )(i)
     }
+}
+
+fn parse_impl(input: &str) -> IResult<&str, Expr> {
+    tuple((
+        wrap("impl"),
+        _parse_identifier,
+        wrap("for"),
+        _parse_identifier
+    ))(input).map(|(i, (_, t, _, s))| {
+        (i, Expr::Impl {
+            name: Token::Identifier(t.into()),
+            target: Token::Identifier(s.into())
+        })
+    })
+}
+
+fn parse_trait(input: &str) -> IResult<&str, Expr> {
+    tuple((
+        wrap("trait"),
+        _parse_identifier,
+        wrap("{"),
+        many0(parse_func),
+        opt(wrap(",")),
+        wrap("}")
+    ))(input).map(|(i, (_, name, _, methods, _, _))| {
+        (
+            i,
+            Expr::Trait {
+                name: Token::Identifier(name.into()),
+                methods,
+            },
+        )
+    })
+}
+
+fn parse_scope(input: &str) -> IResult<&str, Expr> {
+    tuple((wrap("{"), body(), wrap("}")))(input).map(|(i, (_, body, _))| (i, Expr::Scope(body)))
 }
 
 fn parse_if(input: &str) -> IResult<&str, Expr> {
@@ -211,13 +264,13 @@ fn parse_func(input: &str) -> IResult<&str, Expr> {
         body(),
         wrap("}"),
     ))(input)
-    .map(|(i, (_, name, _, args, _, _, body, _))| {
+    .map(|(i, (_, name, _, params, _, _, body, _))| {
         let name = if let Some(Expr::Term(Token::Identifier(name))) = name {
             Some(name)
         } else {
             None
         };
-        (i, Expr::Func { name, args, body })
+        (i, Expr::Func { name, params, body })
     })
 }
 
@@ -248,7 +301,7 @@ fn parse_collection_assignment(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_kw_deref(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("deref "), alt((parse_term, parse_access))))(input)
+    tuple((wrap("follow "), alt((parse_access, parse_term))))(input)
         .map(|(i, (_, o))| (i, Expr::Deref(o.into())))
 }
 
@@ -342,7 +395,7 @@ fn parse_call(input: &str) -> IResult<&str, Expr> {
 
 fn parse_pipe(input: &str) -> IResult<&str, Expr> {
     let (mut input, mut left) = parse_andor(input)?;
-    while let Ok(next) = wrap("|")(input).map(|(i, _)| i) {
+    while let Ok(next) = wrap("&")(input).map(|(i, _)| i) {
         let (i, right) = parse_andor(next)?;
         input = i;
         left = Expr::Pipe {
@@ -354,11 +407,11 @@ fn parse_pipe(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_access(input: &str) -> IResult<&str, Expr> {
-    let (mut input, mut left) = parse_call(input)?;
+    let (mut input, mut left) = delimited(skippables, parse_call, skippables)(input)?;
     loop {
         match input.chars().next() {
             Some('.') => {
-                let (i, mut right) = parse_identifier(&input[1..])?;
+                let (i, mut right) = delimited(skippables, parse_term, skippables)(&input[1..])?;
                 if let Expr::Term(Token::Identifier(inner)) = right {
                     right = Expr::Term(Token::StringLiteral(inner));
                 }
@@ -369,7 +422,7 @@ fn parse_access(input: &str) -> IResult<&str, Expr> {
                 };
             }
             Some('(') => {
-                let (i, args) = parse_args(&input[1..])?;
+                let (i, args) = delimited(skippables, parse_args, skippables)(&input[1..])?;
                 input = char(')')(i)?.0;
                 left = Expr::Call {
                     target: Box::new(left),
@@ -378,7 +431,7 @@ fn parse_access(input: &str) -> IResult<&str, Expr> {
             }
             Some('[') => {
                 let (i, right) =
-                    parse(&input[1..]).unwrap_or((&input[1..], Expr::Term(Token::Nil)));
+                delimited(skippables, parse, skippables)(&input[1..]).unwrap_or((&input[1..], Expr::Term(Token::Nil)));
                 input = char(']')(i)?.0;
                 left = Expr::Access {
                     target: Box::new(left),
@@ -391,18 +444,35 @@ fn parse_access(input: &str) -> IResult<&str, Expr> {
     Ok((input, left))
 }
 
+fn parse_inc_dec(input: &str) -> IResult<&str, Expr> {
+    tuple((
+        parse_identifier,
+        alt((wrap("++"), wrap("--")))
+    ))(input).map(|(i, (id, o))| {
+        (i, Expr::Assign {
+            target: id.clone().into(),
+            value: Expr::Binary {
+                op: if o == "++" { Token::Add } else { Token::Sub },
+                left: id.into(),
+                right: Expr::Term(Token::Int(1)).into() }.into()
+            }
+        )
+    })
+}
+
 fn parse_term(input: &str) -> IResult<&str, Expr> {
     alt((
+        parse_inc_dec,
         parse_continue,
         parse_func,
         parse_return,
         parse_break,
         parse_unary,
-        parse_ref,
+        // parse_ref,
         parse_deref,
         parse_identifier,
         parse_string_literal,
-        parse_float,
+        parse_num,
         parse_sequence,
         parse_collection,
         parse_grouped,
@@ -442,16 +512,20 @@ fn parse_return(input: &str) -> IResult<&str, Expr> {
     tuple((wrap("return"), parse))(input).map(|(i, (_, o))| (i, Expr::Return(o.into())))
 }
 
-fn parse_ref(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("&"), parse))(input).map(|(i, (_, o))| (i, Expr::Ref(o.into())))
-}
+// fn parse_ref(input: &str) -> IResult<&str, Expr> {
+//     tuple((wrap("&"), parse))(input).map(|(i, (_, o))| (i, Expr::Ref(o.into())))
+// }
 
 fn parse_deref(input: &str) -> IResult<&str, Expr> {
     tuple((wrap("*"), parse))(input).map(|(i, (_, o))| (i, Expr::Deref(o.into())))
 }
 
-fn parse_identifier(input: &str) -> IResult<&str, Expr> {
+fn _parse_identifier(input: &str) -> IResult<&str, &str> {
     recognize(many1(pair(alpha1, many0(one_of("_")))))(input)
+}
+
+fn parse_identifier(input: &str) -> IResult<&str, Expr> {
+    _parse_identifier(input)
         .map(|(i, o)| (i, Expr::Term(o.into())))
 }
 
@@ -488,7 +562,7 @@ fn parse_string_literal(input: &str) -> IResult<&str, Expr> {
     })
 }
 
-fn parse_float(input: &str) -> IResult<&str, Expr> {
+fn parse_num(input: &str) -> IResult<&str, Expr> {
     tuple((recognize_float_parts, skippables))(input).map(|(i, (o, _))| {
         let (sign, integer, fraction, exponent) = o;
         if exponent != 0 || !fraction.is_empty() {
@@ -519,12 +593,12 @@ fn parse_for(input: &str) -> IResult<&str, Expr> {
         body(),
         wrap("}"),
     ))(input)
-    .map(|(i, (_, pin, _, value, _, body, _))| {
+    .map(|(i, (_, pin, _, iterable, _, body, _))| {
         (
             i,
             Expr::For {
                 pin: Box::new(pin),
-                value: Box::new(value),
+                iterable: Box::new(iterable),
                 body,
             },
         )

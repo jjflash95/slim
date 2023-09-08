@@ -361,11 +361,11 @@ mod tests {
 
         assert_eq!(parse(input).unwrap().1, expected);
 
-        let input = "seq[0][1]  = 20";
+        let input = "s[0][1]  = 20";
         let expected = Assign {
             target: Access {
                 target: Access {
-                    target: Term(Identifier("seq".to_owned())).into(),
+                    target: Term(Identifier("s".to_owned())).into(),
                     field: Term(Int(0)).into(),
                 }
                 .into(),
@@ -383,7 +383,7 @@ mod tests {
         let input = "func() {}";
         let expected = Func {
             name: None,
-            args: vec![],
+            params: vec![],
             body: vec![],
         };
 
@@ -392,7 +392,7 @@ mod tests {
         let input = "func() { x  = 1 }";
         let expected = Func {
             name: None,
-            args: vec![],
+            params: vec![],
             body: vec![Assign {
                 target: Term(Identifier("x".to_owned())).into(),
                 value: Term(Int(1)).into(),
@@ -407,7 +407,7 @@ mod tests {
         }";
         let expected = Func {
             name: None,
-            args: vec![],
+            params: vec![],
             body: vec![
                 Assign {
                     target: Term(Identifier("x".to_owned())).into(),
@@ -429,7 +429,7 @@ mod tests {
         }";
         let expected = Func {
             name: None,
-            args: vec![],
+            params: vec![],
             body: vec![
                 Assign {
                     target: Term(Identifier("x".to_owned())).into(),
@@ -454,7 +454,7 @@ mod tests {
 
         let expected = Func {
             name: Some("sum".to_owned()),
-            args: vec![
+            params: vec![
                 Term(Identifier("a".to_owned())),
                 Term(Identifier("b".to_owned())),
             ],
@@ -478,7 +478,7 @@ mod tests {
             target: Term(Identifier("x".to_owned())).into(),
             value: Func {
                 name: Some("sum".to_owned()),
-                args: vec![
+                params: vec![
                     Term(Identifier("a".to_owned())),
                     Term(Identifier("b".to_owned())),
                 ],
@@ -503,7 +503,7 @@ mod tests {
         let expected = Call {
             target: Func {
                 name: Some("sum".to_owned()),
-                args: vec![
+                params: vec![
                     Term(Identifier("a".to_owned())),
                     Term(Identifier("b".to_owned())),
                 ],
@@ -533,7 +533,7 @@ mod tests {
             value: Call {
                 target: Func {
                     name: None,
-                    args: vec![
+                    params: vec![
                         Term(Identifier("a".to_owned())),
                         Term(Identifier("b".to_owned())),
                     ],
@@ -558,11 +558,11 @@ mod tests {
 
         assert_eq!(parse(input).unwrap().1, expected);
 
-        let input = "seq[0][1](params)";
+        let input = "s[0][1](params)";
         let expected = Call {
             target: Access {
                 target: Access {
-                    target: Term(Identifier("seq".to_owned())).into(),
+                    target: Term(Identifier("s".to_owned())).into(),
                     field: Term(Int(0)).into(),
                 }
                 .into(),
@@ -581,7 +581,7 @@ mod tests {
             target: Term(Identifier("y".to_owned())).into(),
             value: For {
                 pin: Term(Identifier("value".to_owned())).into(),
-                value: Term(Identifier("sequence".to_owned())).into(),
+                iterable: Term(Identifier("sequence".to_owned())).into(),
                 body: vec![],
             }
             .into(),
@@ -596,7 +596,7 @@ mod tests {
             target: Term(Identifier("y".to_owned())).into(),
             value: For {
                 pin: Term(Identifier("value".to_owned())).into(),
-                value: Sequence(vec![Term(Int(1)), Term(Int(2)), Term(Int(3))]).into(),
+                iterable: Sequence(vec![Term(Int(1)), Term(Int(2)), Term(Int(3))]).into(),
                 body: vec![Assign {
                     target: Term(Identifier("x".to_owned())).into(),
                     value: Binary {
@@ -807,7 +807,7 @@ mod tests {
 
     #[test]
     fn test_pipes() {
-        let input = "1 | double | sub_one";
+        let input = "1 & double & sub_one";
         let expected = Pipe {
             parent: Term(Identifier("sub_one".to_owned())).into(),
             child: Pipe {
@@ -819,7 +819,7 @@ mod tests {
 
         assert_eq!(parse(input).unwrap().1, expected);
 
-        let input = "1 | double | sub(1)";
+        let input = "1 & double & sub(1)";
         let expected = Pipe {
             parent: Call {
                 target: Term(Identifier("sub".to_owned())).into(),
@@ -835,7 +835,7 @@ mod tests {
 
         assert_eq!(parse(input).unwrap().1, expected);
 
-        let input = "trimmed_uppercase_str = ' this is my string\t' | trim | uppercase";
+        let input = "trimmed_uppercase_str = ' this is my string\t' & trim & uppercase";
         let expected = Assign {
             target: Term(Identifier("trimmed_uppercase_str".to_owned())).into(),
             value: Pipe {
@@ -851,7 +851,7 @@ mod tests {
 
         assert_eq!(parse(input).unwrap().1, expected);
 
-        let input = "hello_world = 'Hello' | push(' world') | push('!')";
+        let input = "hello_world = 'Hello' & push(' world') & push('!')";
         let expected = Assign {
             target: Term(Identifier("hello_world".to_owned())).into(),
             value: Pipe {
@@ -900,7 +900,7 @@ mod tests {
                 target: Term(Identifier("z".to_owned())).into(),
                 value: Func {
                     name: None,
-                    args: vec![],
+                    params: vec![],
                     body: vec![Return(Term(Int(0)).into())],
                 }
                 .into(),
@@ -931,7 +931,7 @@ mod tests {
                 target: Term(Identifier("z".to_owned())).into(),
                 value: Func {
                     name: None,
-                    args: vec![],
+                    params: vec![],
                     body: vec![Return(
                         Access {
                             target: Term(_Self).into(),
@@ -943,42 +943,6 @@ mod tests {
                 .into(),
             },
         ]);
-
-        assert_eq!(parse(input).unwrap().1, expected);
-    }
-
-    #[test]
-    fn test_refs() {
-        let input = "a = &b";
-        let expected = Assign {
-            target: Term(Identifier("a".to_owned())).into(),
-            value: Ref(Term(Identifier("b".to_owned())).into()).into(),
-        };
-
-        assert_eq!(parse(input).unwrap().1, expected);
-
-        let input = "
-        a = &b[0]
-        ";
-        let expected = Assign {
-            target: Term(Identifier("a".to_owned())).into(),
-            value: Ref(Access {
-                target: Term(Identifier("b".to_owned())).into(),
-                field: Term(Int(0)).into(),
-            }
-            .into())
-            .into(),
-        };
-
-        assert_eq!(parse(input).unwrap().1, expected);
-
-        let input = "
-        a = &&&b
-        ";
-        let expected = Assign {
-            target: Term(Identifier("a".to_owned())).into(),
-            value: Ref(Ref(Ref(Term(Identifier("b".to_owned())).into()).into()).into()).into(),
-        };
 
         assert_eq!(parse(input).unwrap().1, expected);
     }

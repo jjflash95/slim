@@ -1,13 +1,13 @@
 use crate::parser;
 use crate::runtime;
-use crate::runtime::context::MutRef;
-use crate::runtime::context::RuntimeContext;
 use crate::runtime::RuntimeError;
+use crate::runtime::scope::Scope;
+use crate::runtime::builtins;
 use std::fs;
 use std::io::{self, Write};
 
 pub fn interactive() -> Result<(), i32> {
-    let ctx = get_ctx();
+    let mut scope = get_scope();
     loop {
         print!("> ");
         let mut input = String::new();
@@ -24,8 +24,8 @@ pub fn interactive() -> Result<(), i32> {
             match parser::parse(&input) {
                 Ok((_, ast)) => {
                     let r = match ast {
-                        parser::Expr::Term(t) => runtime::eval_materialized_term(t, ctx.mut_ref()),
-                        _ => runtime::eval(ast, ctx.mut_ref()),
+                        // parser::Expr::Term(t) => runtime::eval_materialized_term(t, ctx.mut_ref()),
+                        _ => runtime::evaluate(&mut scope, ast),
                     };
 
                     if let Err(RuntimeError(e)) = r {
@@ -47,7 +47,7 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
     let program = fs::read_to_string(path).unwrap();
     let p = program.clone();
     let mut input = program.as_str();
-    let ctx = get_ctx();
+    let mut scope = get_scope();
 
     loop {
         if [""].contains(&input.trim()) {
@@ -57,7 +57,7 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
         match parser::parse(input) {
             Ok((i, ast)) => {
                 input = i;
-                if let Err(RuntimeError(e)) = runtime::eval(ast, ctx.mut_ref()) {
+                if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, ast) {
                     handle_runtime_err(p, i, e);
                     return Err(1);
                 }
@@ -76,10 +76,12 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
     Ok(())
 }
 
-fn get_ctx() -> RuntimeContext {
-    let ctx = RuntimeContext::default();
-    ctx.borrow_mut().set_builtins();
-    ctx
+fn get_scope() -> Scope {
+    let mut s = Scope::root();
+    for (name, f) in builtins::default() {
+        s.set(name, f)
+    }
+    s
 }
 
 fn find_error_on_string(main_text: &str, substring: &str) -> Option<(usize, usize)> {

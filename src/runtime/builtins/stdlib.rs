@@ -1,19 +1,32 @@
 use std::time::SystemTime;
 
 use crate::runtime::builtins::next_arg;
-use crate::runtime::{context::RuntimeContext, operations::Helpers, EResult, RuntimeError, Value};
+use crate::runtime::scope::MutRef;
+use crate::runtime::eval;
+use crate::runtime::{scope::RuntimeScope, operations::Helpers, EResult, RuntimeError, Value};
 
-pub fn concat(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn concat(args: &mut Vec<Value>, ctx: RuntimeScope) -> EResult {
     let mut first = next_arg(args, "string")?;
     for arg in args {
-        first = first.concat(arg.clone())?
+        if let Value::Ref(r) = arg {
+            first = first.concat(eval(r.clone(), ctx.mut_ref())?)?;
+        } else {
+            first = first.concat(arg.clone())?;
+        }
     }
 
     Ok(first)
 }
 
-pub fn len(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
-    let arg = next_arg(args, "string|sequence|collection")?;
+pub fn len(args: &mut Vec<Value>, ctx: RuntimeScope) -> EResult {
+    let mut arg = next_arg(args, "string|sequence|collection")?;//.resolve_inner(&ctx)?;
+    // dbg!(&arg);
+    if let Value::Ref(r) = arg {
+        // dbg!("evaluating inner r: ", &r);
+        arg = eval(r, ctx.mut_ref())?;
+        // dbg!(&arg);
+    };
+    // dbg!(&arg);
     Ok(match arg {
         Value::StringLiteral(s) => Value::Int(s.len() as i128),
         Value::Sequence(values) => Value::Int(values.len() as i128),
@@ -21,7 +34,7 @@ pub fn len(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     })
 }
 
-pub fn lowercase(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn lowercase(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let arg = next_arg(args, "string")?;
     Ok(match arg {
         Value::StringLiteral(s) => Value::StringLiteral(s.to_lowercase()),
@@ -32,7 +45,7 @@ pub fn lowercase(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     })
 }
 
-pub fn trim(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn trim(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let arg = next_arg(args, "string")?;
     Ok(match arg {
         Value::StringLiteral(s) => Value::StringLiteral(s.trim().to_string()),
@@ -43,7 +56,7 @@ pub fn trim(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     })
 }
 
-pub fn replace(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn replace(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let arg = next_arg(args, "string")?;
     let from: String = next_arg(args, "from")?.try_into()?;
     let to: String = next_arg(args, "to")?.try_into()?;
@@ -57,7 +70,7 @@ pub fn replace(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     })
 }
 
-pub fn split(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn split(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let arg = next_arg(args, "string")?;
     let sep: String = next_arg(args, "separator")
         .unwrap_or_else(|_| Value::StringLiteral("".to_string()))
@@ -83,7 +96,7 @@ pub fn split(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     })
 }
 
-pub fn range(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn range(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let start = next_arg(args, "start")?.try_into()?;
     let end: i128 = next_arg(args, "end")?.try_into()?;
     let step: i128 = if let Ok(arg) = next_arg(args, "step") {
@@ -100,7 +113,7 @@ pub fn range(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     ))
 }
 
-pub fn pop(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn pop(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let seq = &mut args[0];
     if let Value::Sequence(values) = seq {
         Ok(values.pop().unwrap_or(Value::Nil))
@@ -109,14 +122,18 @@ pub fn pop(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
     }
 }
 
-pub fn slice(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn slice(args: &mut Vec<Value>, ctx: RuntimeScope) -> EResult {
     if args.len() < 3 {
         return Err(RuntimeError("Slice needs 3 arguments".to_string()))?;
     }
-
-    let iterable = next_arg(args, "sequence")?;
+    
+    let mut iterable = next_arg(args, "sequence")?;
+    if let Value::Ref(r) = iterable {
+        iterable = eval(r, ctx.mut_ref())?;
+    };
     let start: i128 = next_arg(args, "start")?.try_into()?;
     let end: i128 = next_arg(args, "end")?.try_into()?;
+    // dbg!(&iterable, &start, &end);
     match iterable {
         Value::Sequence(seq) => Ok(Value::Sequence(seq[start as usize..end as usize].to_vec())),
         Value::StringLiteral(s) => Ok(Value::StringLiteral(
@@ -124,17 +141,17 @@ pub fn slice(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
         )),
         _ => Err(RuntimeError(format!(
             "Slice needs a sequence or string as first argument, got: {}",
-            iterable.type_hint()
+            iterable
         ))),
     }
 }
 
-pub fn to_string(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn to_string(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let value = next_arg(args, "string")?;
     Ok(Value::StringLiteral(value.to_string()))
 }
 
-pub fn random(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn random(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let lower: i128 = next_arg(args, "lower")?.try_into()?;
     let upper: i128 = next_arg(args, "upper")?.try_into()?;
     let mut seed = SystemTime::now()

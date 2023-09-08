@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use crate::runtime::builtins::BuiltinFunc;
-use crate::runtime::context::RuntimeContext;
+use crate::runtime::scope::RuntimeScope;
 use crate::runtime::{EResult, RuntimeError, Value};
 
-pub fn instant(_: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn instant(_: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap();

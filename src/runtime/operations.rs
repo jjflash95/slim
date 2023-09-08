@@ -1,34 +1,39 @@
 use crate::parser::Token;
+use crate::rt_err;
 use crate::runtime::EResult;
 use crate::runtime::RuntimeError;
-use crate::runtime::Value;
+use crate::runtime::Object;
+
+use super::object::ObjectRef;
+use super::object::Ord;
+
 
 pub trait BinOps {
-    fn binary(self, op: Token, other: Self) -> EResult;
-    fn add(self, other: Self) -> EResult;
-    fn sub(self, other: Self) -> EResult;
-    fn mult(self, other: Self) -> EResult;
-    fn div(self, other: Self) -> EResult;
-    fn coef(self, other: Self) -> EResult;
-    fn eq(self, other: Self) -> EResult;
-    fn ne(self, other: Self) -> EResult;
-    fn gt(self, other: Self) -> EResult;
-    fn gte(self, other: Self) -> EResult;
-    fn lt(self, other: Self) -> EResult;
-    fn lte(self, other: Self) -> EResult;
-    fn contains(self, ohter: Self) -> EResult;
-    fn and(self, other: Self) -> EResult;
-    fn or(self, other: Self) -> EResult;
+    fn binary(self, op: Token, other: Self) -> EResult<Object>;
+    fn add(self, other: Self) -> EResult<Object>;
+    fn sub(self, other: Self) -> EResult<Object>;
+    fn mult(self, other: Self) -> EResult<Object>;
+    fn div(self, other: Self) -> EResult<Object>;
+    fn coef(self, other: Self) -> EResult<Object>;
+    fn eq(self, other: Self) -> EResult<Object>;
+    fn ne(self, other: Self) -> EResult<Object>;
+    fn gt(self, other: Self) -> EResult<Object>;
+    fn gte(self, other: Self) -> EResult<Object>;
+    fn lt(self, other: Self) -> EResult<Object>;
+    fn lte(self, other: Self) -> EResult<Object>;
+    fn contains(self, ohter: Self) -> EResult<Object>;
+    fn and(self, other: Self) -> EResult<Object>;
+    fn or(self, other: Self) -> EResult<Object>;
 }
 
 pub trait UnaryOps {
-    fn unary(self, token: Token) -> EResult;
-    fn negative(self) -> EResult;
-    fn not(self) -> EResult;
+    fn unary(self, token: Token) -> EResult<Object>;
+    fn negative(self) -> EResult<Object>;
+    fn not(self) -> EResult<Object>;
 }
 
-impl UnaryOps for Value {
-    fn unary(self, op: Token) -> EResult {
+impl UnaryOps for Object {
+    fn unary(self, op: Token) -> EResult<Object> {
         match op {
             Token::Negative => self.negative(),
             Token::Not => self.not(),
@@ -39,10 +44,10 @@ impl UnaryOps for Value {
         }
     }
 
-    fn negative(self) -> EResult {
+    fn negative(self) -> EResult<Object> {
         match self {
-            Value::Int(n) => Ok(Value::Int(-n)),
-            Value::Float(f) => Ok(Value::Float(-f)),
+            Object::Int(n) => Ok(Object::Int(-n)),
+            Object::Float(f) => Ok(Object::Float(-f)),
             _ => Err(RuntimeError(format!(
                 "Cannot get negative value of {:?}",
                 self
@@ -50,13 +55,13 @@ impl UnaryOps for Value {
         }
     }
 
-    fn not(self) -> EResult {
-        Ok(Value::Bool(!self.to_bool()))
+    fn not(self) -> EResult<Object> {
+        Ok(Object::Bool(true))//(!self.to_bool()))
     }
 }
 
-impl BinOps for Value {
-    fn binary(self, op: Token, other: Self) -> EResult {
+impl BinOps for Object {
+    fn binary(self, op: Token, other: Self) -> EResult<Object> {
         match op {
             Token::Add => self.add(other),
             Token::Sub => self.sub(other),
@@ -79,190 +84,126 @@ impl BinOps for Value {
         }
     }
 
-    fn add(self, other: Self) -> EResult {
+    fn add(self, other: Self) -> EResult<Object> {
         match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Int(l + r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Float(l + r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Float(l + r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Float(l as f64 + r)),
+            (Object::Int(l), Object::Int(r)) => Ok(Object::Int(l + r)),
+            (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l + r)),
+            (Object::Float(l), Object::Int(r)) => Ok(Object::Float(l + r as f64)),
+            (Object::Int(l), Object::Float(r)) => Ok(Object::Float(l as f64 + r)),
             (l, r) => Err(RuntimeError(format!("Cannot add {:?} to {:?}", l, r))),
         }
     }
 
-    fn sub(self, other: Self) -> EResult {
+    fn sub(self, other: Self) -> EResult<Object> {
         match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Int(l - r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Float(l - r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Float(l - r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Float(l as f64 - r)),
+            (Object::Int(l), Object::Int(r)) => Ok(Object::Int(l - r)),
+            (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l - r)),
+            (Object::Float(l), Object::Int(r)) => Ok(Object::Float(l - r as f64)),
+            (Object::Int(l), Object::Float(r)) => Ok(Object::Float(l as f64 - r)),
             (l, r) => Err(RuntimeError(format!("Cannot sub {:?} to {:?}", l, r))),
         }
     }
 
-    fn mult(self, other: Self) -> EResult {
+    fn mult(self, other: Self) -> EResult<Object> {
         match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Int(l * r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Float(l * r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Float(l * r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Float(l as f64 * r)),
+            (Object::Int(l), Object::Int(r)) => Ok(Object::Int(l * r)),
+            (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l * r)),
+            (Object::Float(l), Object::Int(r)) => Ok(Object::Float(l * r as f64)),
+            (Object::Int(l), Object::Float(r)) => Ok(Object::Float(l as f64 * r)),
             (l, r) => Err(RuntimeError(format!("Cannot mult {:?} to {:?}", l, r))),
         }
     }
 
-    fn div(self, other: Self) -> EResult {
+    fn div(self, other: Self) -> EResult<Object> {
         match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Float(l as f64 / r as f64)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Float(l / r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Float(l / r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Float(l as f64 / r)),
+            (Object::Int(l), Object::Int(r)) => Ok(Object::Float(l as f64 / r as f64)),
+            (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l / r)),
+            (Object::Float(l), Object::Int(r)) => Ok(Object::Float(l / r as f64)),
+            (Object::Int(l), Object::Float(r)) => Ok(Object::Float(l as f64 / r)),
             (l, r) => Err(RuntimeError(format!("Cannot div {:?} to {:?}", l, r))),
         }
     }
 
-    fn coef(self, other: Self) -> EResult {
+    fn coef(self, other: Self) -> EResult<Object> {
         match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Int(l % r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Float(l % r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Float(l % r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Float(l as f64 % r)),
+            (Object::Int(l), Object::Int(r)) => Ok(Object::Int(l % r)),
+            (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l % r)),
+            (Object::Float(l), Object::Int(r)) => Ok(Object::Float(l % r as f64)),
+            (Object::Int(l), Object::Float(r)) => Ok(Object::Float(l as f64 % r)),
             (l, r) => Err(RuntimeError(format!("Cannot mod {:?} to {:?}", l, r))),
         }
     }
 
-    fn eq(self, other: Self) -> EResult {
-        match (self, other) {
-            (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l == r)),
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Bool(l == r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l == r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l == r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) == r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => Ok(Value::Bool(l == r)),
-            (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l == r)),
-            (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l == r)),
-            (l, r) => Err(RuntimeError(format!(
-                "Cannot compare eq {:?} to {:?}",
-                l, r
-            ))),
+    fn eq(self, other: Self) -> EResult<Object> {
+        Ok(Object::Bool(self == other))
+    }
+
+    fn ne(self, other: Self) -> EResult<Object> {
+        Ok(Object::Bool(self != other))
+    }
+
+    fn gt(self, other: Self) -> EResult<Object> {
+        match self.partial_cmp(&other) {
+            Some(Ord::Greater) => Ok(Object::Bool(true)),
+            Some(_) => Ok(Object::Bool(false)),
+            None => rt_err!("Cannot compare gt {} on {}", self, other),
         }
     }
 
-    fn ne(self, other: Self) -> EResult {
-        match (self, other) {
-            (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l == r)),
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Bool(l != r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l != r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l != r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) != r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => Ok(Value::Bool(l != r)),
-            (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l != r)),
-            (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l != r)),
-            (l, r) => Err(RuntimeError(format!(
-                "Cannot compare ne {:?} to {:?}",
-                l, r
-            ))),
+    fn gte(self, other: Self) -> EResult<Object> {
+        match self.partial_cmp(&other) {
+            Some(Ord::Greater) => Ok(Object::Bool(true)),
+            Some(Ord::Equal) => Ok(Object::Bool(true)),
+            Some(_) => Ok(Object::Bool(false)),
+            None => rt_err!("Cannot compare gte {} on {}", self, other),
         }
     }
 
-    fn gt(self, other: Self) -> EResult {
-        match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Bool(l > r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l > r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l > r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) > r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => {
-                Ok(Value::Bool(l.len() > r.len()))
-            }
-            (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l.len() > r.len())),
-            // (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l.len() > r.len())), // should I?
-            (l, r) => Err(RuntimeError(format!(
-                "Cannot compare gt {:?} to {:?}",
-                l, r
-            ))),
+    fn lt(self, other: Self) -> EResult<Object> {
+        match self.partial_cmp(&other) {
+            Some(Ord::Less) => Ok(Object::Bool(true)),
+            Some(_) => Ok(Object::Bool(false)),
+            None => rt_err!("Cannot compare lt {} on {}", self, other),
         }
     }
 
-    fn gte(self, other: Self) -> EResult {
-        match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Bool(l >= r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l >= r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l >= r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) >= r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => {
-                Ok(Value::Bool(l.len() >= r.len()))
-            }
-            (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l.len() >= r.len())),
-            // (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l.len() >= r.len())), // should I?
-            (l, r) => Err(RuntimeError(format!(
-                "Cannot compare gte {:?} to {:?}",
-                l, r
-            ))),
+    fn lte(self, other: Self) -> EResult<Object> {
+        match self.partial_cmp(&other) {
+            Some(Ord::Less) => Ok(Object::Bool(true)),
+            Some(Ord::Equal) => Ok(Object::Bool(true)),
+            Some(_) => Ok(Object::Bool(false)),
+            None => rt_err!("Cannot compare lte {} on {}", self, other),
         }
     }
 
-    fn lt(self, other: Self) -> EResult {
-        match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Bool(l < r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l < r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l < r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) < r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => {
-                Ok(Value::Bool(l.len() < r.len()))
-            }
-            (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l.len() < r.len())),
-            // (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l.len() < r.len())),
-            (l, r) => Err(RuntimeError(format!(
-                "Cannot compare lt {:?} to {:?}",
-                l, r
-            ))),
-        }
-    }
-
-    fn lte(self, other: Self) -> EResult {
-        match (self, other) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Bool(l <= r)),
-            (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(l <= r)),
-            (Value::Float(l), Value::Int(r)) => Ok(Value::Bool(l <= r as f64)),
-            (Value::Int(l), Value::Float(r)) => Ok(Value::Bool((l as f64) <= r)),
-            (Value::StringLiteral(l), Value::StringLiteral(r)) => {
-                Ok(Value::Bool(l.len() <= r.len()))
-            }
-            (Value::Sequence(l), Value::Sequence(r)) => Ok(Value::Bool(l.len() <= r.len())),
-            // (Value::Collection(l), Value::Collection(r)) => Ok(Value::Bool(l.len() <= r.len())),
-            (l, r) => Err(RuntimeError(format!(
-                "Cannot compare lt {:?} to {:?}",
-                l, r
-            ))),
-        }
-    }
-
-    fn contains(self, other: Self) -> EResult {
+    fn contains(self, other: Self) -> EResult<Object> {
         match other {
-            Value::Sequence(s) => Ok(Value::Bool(s.contains(&self))),
-            Value::Collection(f) => Ok(Value::Bool(
+            Object::Sequence(s) => Ok(Object::Bool(s.contains(&self.into()))),
+            Object::Collection(f) => Ok(Object::Bool(
                 f.contains_key(TryInto::<String>::try_into(self)?.as_str()),
             )),
-            Value::StringLiteral(s) => Ok(Value::Bool(
+            Object::Str(s) => Ok(Object::Bool(
                 s.contains(TryInto::<String>::try_into(self)?.as_str()),
             )),
             _ => Err(RuntimeError(format!(
-                "Cannot check if <{}> contains <{}>",
-                self.type_hint(),
-                other.type_hint()
+                "Cannot check if <{:?}> contains <{:?}>",
+                self,
+                other
             ))),
         }
     }
 
-    fn and(self, other: Self) -> EResult {
+    fn and(self, other: Self) -> EResult<Object> {
         match (&self, other) {
-            (&Value::Int(l), other) => Ok(if l == 0 { self } else { other }),
-            (&Value::Float(l), other) => Ok(if l == 0.0 { self } else { other }),
-            (&Value::Bool(l), other) => Ok(if !l { self } else { other }),
-            (&Value::StringLiteral(ref l), other) => Ok(if l.is_empty() { self } else { other }),
-            (&Value::Nil, ..) => Ok(self),
-            (&Value::Collection(ref fields), other) => {
+            (&Object::Int(l), other) => Ok(if l == 0 { self } else { other }),
+            (&Object::Float(l), other) => Ok(if l == 0.0 { self } else { other }),
+            (&Object::Bool(l), other) => Ok(if !l { self } else { other }),
+            (&Object::Str(ref l), other) => Ok(if l.is_empty() { self } else { other }),
+            (&Object::Nil, ..) => Ok(self),
+            (&Object::Collection(ref fields), other) => {
                 Ok(if fields.is_empty() { self } else { other })
             }
-            (&Value::Func { .. }, other) => Ok(other),
+            (&Object::Func { .. }, other) => Ok(other),
             (l, r) => Err(RuntimeError(format!(
                 "Cannot compare && {:?} to {:?}",
                 l, r
@@ -270,17 +211,17 @@ impl BinOps for Value {
         }
     }
 
-    fn or(self, other: Self) -> EResult {
+    fn or(self, other: Self) -> EResult<Object> {
         match (&self, other) {
-            (&Value::Int(l), other) => Ok(if l == 0 { other } else { self }),
-            (&Value::Float(l), other) => Ok(if l == 0.0 { other } else { self }),
-            (&Value::Bool(l), other) => Ok(if !l { other } else { self }),
-            (&Value::StringLiteral(ref l), other) => Ok(if l.is_empty() { other } else { self }),
-            (&Value::Nil, other) => Ok(other),
-            (&Value::Collection(ref fields), other) => {
+            (&Object::Int(l), other) => Ok(if l == 0 { other } else { self }),
+            (&Object::Float(l), other) => Ok(if l == 0.0 { other } else { self }),
+            (&Object::Bool(l), other) => Ok(if !l { other } else { self }),
+            (&Object::Str(ref l), other) => Ok(if l.is_empty() { other } else { self }),
+            (&Object::Nil, other) => Ok(other),
+            (&Object::Collection(ref fields), other) => {
                 Ok(if fields.is_empty() { other } else { self })
             }
-            (&Value::Func { .. }, ..) => Ok(self),
+            (&Object::Func { .. }, ..) => Ok(self),
             (l, r) => Err(RuntimeError(format!(
                 "Cannot compare || {:?} to {:?}",
                 l, r
@@ -290,38 +231,38 @@ impl BinOps for Value {
 }
 
 pub trait Helpers {
-    fn concat(self, other: Self) -> EResult;
-    fn len(self) -> EResult;
+    fn concat(self, other: Self) -> EResult<Object>;
+    fn len(self) -> EResult<Object>;
 }
 
-impl Helpers for Value {
-    fn concat(self, other: Value) -> EResult {
+impl Helpers for Object {
+    fn concat(self, other: Object) -> EResult<Object> {
         match self {
-            Value::StringLiteral(a) => Ok(Value::StringLiteral(
+            Object::Str(a) => Ok(Object::Str(
                 a + TryInto::<String>::try_into(other)?.as_ref(),
             )),
-            Value::Sequence(values) => Ok(Value::Sequence(
+            Object::Sequence(values) => Ok(Object::Sequence(
                 values
                     .into_iter()
-                    .chain(TryInto::<Vec<Value>>::try_into(other)?)
+                    .chain(TryInto::<Vec<ObjectRef>>::try_into(other)?)
                     .collect(),
             )),
             _ => Err(RuntimeError(format!(
-                "Cannot merge {} to {}",
-                self.type_hint(),
-                other.type_hint()
+                "Cannot merge {:?} to {:?}",
+                self,
+                other
             ))),
         }
     }
 
-    fn len(self) -> EResult {
+    fn len(self) -> EResult<Object> {
         match self {
-            Value::StringLiteral(s) => Ok(Value::Int(s.len() as i128)),
-            Value::Sequence(values) => Ok(Value::Int(values.len() as i128)),
-            Value::Collection(fields) => Ok(Value::Int(fields.len() as i128)),
+            Object::Str(s) => Ok(Object::Int(s.len() as i128)),
+            Object::Sequence(values) => Ok(Object::Int(values.len() as i128)),
+            Object::Collection(fields) => Ok(Object::Int(fields.len() as i128)),
             v => Err(RuntimeError(format!(
-                "Cannot get len of: <{}>",
-                v.type_hint()
+                "Cannot get len of: <{:?}>",
+                v
             ))),
         }
     }

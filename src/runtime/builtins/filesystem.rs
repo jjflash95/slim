@@ -1,6 +1,6 @@
 use crate::runtime::builtins::next_arg;
 use crate::runtime::builtins::BuiltinFunc;
-use crate::runtime::{context::RuntimeContext, EResult, Value};
+use crate::runtime::{scope::RuntimeScope, EResult, Value};
 use std::{
     collections::HashMap,
     fs::File,
@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub fn open(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn open(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let path: String = next_arg(args, "path")?.try_into()?;
     let file = if Path::new(&path).exists() {
         File::open(&path).expect("Failed to open file")

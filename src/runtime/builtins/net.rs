@@ -8,10 +8,10 @@ use std::{
 
 use crate::runtime::builtins::next_arg;
 use crate::runtime::builtins::BuiltinFunc;
-use crate::runtime::context::RuntimeContext;
+use crate::runtime::scope::RuntimeScope;
 use crate::runtime::{EResult, RuntimeError, Value};
 
-pub fn socket(args: &mut Vec<Value>, _: RuntimeContext) -> EResult {
+pub fn socket(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
     let host: String = next_arg(args, "host")?.try_into()?;
     let port: i128 = next_arg(args, "port")?.try_into()?;
     let listener = TcpListener::bind((host.as_str(), port as u16)).unwrap();
