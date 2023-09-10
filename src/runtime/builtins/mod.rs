@@ -70,7 +70,7 @@ fn dbg(_: &mut Scope, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
 
 fn print(_: &mut Scope, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     for arg in args {
-        print!("{} ", arg.borrow().clone());
+        print!("{}", arg.borrow().clone());
     }
     println!();
     Ok(Object::Nil.into())
