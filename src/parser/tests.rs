@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn test_call() {
-        let input = "x  = a(1)";
+        let input = "x = a(1)";
         let expected = Assign {
             target: Term(Identifier("x".to_owned())).into(),
             value: Call {

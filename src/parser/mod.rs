@@ -1,10 +1,10 @@
 use nom::branch::alt;
-use nom::bytes::complete::take_while;
-use nom::character::complete::{alpha1, one_of};
-use nom::combinator::{not, opt, peek, recognize};
-use nom::multi::{fold_many0, many0, many1, separated_list0};
+use nom::bytes::complete::{take_while, tag};
+use nom::character::complete::{alpha1, one_of, anychar, alphanumeric1};
+use nom::combinator::{not, opt, peek, recognize, all_consuming, verify};
+use nom::multi::{fold_many0, many0, many1, separated_list0, many0_count};
 use nom::number::complete::recognize_float_parts;
-use nom::sequence::{delimited, pair, tuple};
+use nom::sequence::{delimited, pair, tuple, preceded};
 use nom::IResult;
 
 #[cfg(test)]
@@ -43,6 +43,31 @@ pub enum Token {
     TypeBool,
     TypeStruct,
     _Self,
+}
+
+pub enum ParseResult {
+    Statement(Statement),
+    Expression(Expr),
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub enum Statement {
+    Trait {
+        name: Token,
+        methods: Vec<Expr>,
+    },
+    ImplFor {
+        name: Token,
+        target: Token,
+    },
+    Impl {
+        target: Token,
+        methods: Vec<Expr>,
+    },
+    DefStruct {
+        name: String,
+        props: Vec<String>,
+    },
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -92,15 +117,10 @@ pub enum Expr {
     Conditional {
         branches: Vec<(Expr, Vec<Expr>)>,
     },
-    Trait {
-        name: Token,
-        methods: Vec<Expr>,
+    Struct {
+        name: String,
+        props: Vec<Expr>
     },
-    Impl {
-        name: Token,
-        target: Token,
-    },
-    Struct(Vec<Expr>),
     Term(Token),
     Return(Box<Expr>),
     Break(Box<Expr>),
@@ -149,23 +169,41 @@ impl From<&str> for Token {
     }
 }
 
-pub fn parse(input: &str) -> IResult<&str, Expr> {
+fn parse_statement(input: &str) -> IResult<&str, ParseResult> {
     alt((
         parse_trait,
+        parse_struct_def,
+        parse_impl_for,
         parse_impl,
+    ))(input).map(|(i,o)| (i, ParseResult::Statement(o)))
+}
+
+pub fn parse(input: &str) -> IResult<&str, ParseResult> {
+    alt((
+        parse_statement,
+        parse_expr,
+    ))(input.trim_start())
+}
+
+fn parse_expr(input: &str) -> IResult<&str, ParseResult> {
+    _parse_expr(input).map(|(i,o)| (i, ParseResult::Expression(o)))
+}
+
+fn _parse_expr(input: &str) -> IResult<&str, Expr> {
+    alt((
         parse_for,
         parse_if,
         parse_while,
         parse_loop,
-        parse_scope,
+        // parse_scope,
         parse_pipe,
-    ))(input.trim_start())
+    ))(input)
 }
 
 fn body() -> impl Fn(&str) -> IResult<&str, Vec<Expr>> {
     |i| {
         fold_many0(
-            tuple((parse, skippables)),
+            tuple((_parse_expr, skippables)),
             Vec::new,
             |mut acc: Vec<_>, (item, _)| {
                 acc.push(item);
@@ -175,7 +213,59 @@ fn body() -> impl Fn(&str) -> IResult<&str, Vec<Expr>> {
     }
 }
 
-fn parse_impl(input: &str) -> IResult<&str, Expr> {
+fn parse_struct_create(input: &str) -> IResult<&str, Expr> {
+    tuple((
+        wrap("new"),
+        _parse_identifier,
+        wrap("{"),
+        separated_list0(tuple((wrap(","),)), parse_collection_assignment),
+        opt(wrap(",")),
+        wrap("}"),
+    ))(input)
+    .map(|(i, (_, name, _, props, _, _))| (i, Expr::Struct { name: name.into(), props }))
+}
+
+fn parse_struct_def(input: &str) -> IResult<&str, Statement> {
+    tuple((
+        wrap("struct"),
+        _parse_identifier,
+        wrap("{"),
+        separated_list0(tuple((wrap(","),)), _parse_identifier),
+        opt(wrap(",")),
+        wrap("}"),
+    ))(input)
+    .map(|(i, (_, name, _, props, _, _))| {
+        (
+            i,
+            Statement::DefStruct {
+                name: name.into(),
+                props: props.into_iter().map(|p| p.into()).collect(),
+            },
+        )
+    })
+}
+
+fn parse_impl(input: &str) -> IResult<&str, Statement> {
+    tuple((
+        wrap("impl"),
+        _parse_identifier,
+        wrap("{"),
+        many0(parse_func),
+        opt(wrap(",")),
+        wrap("}"),
+    ))(input)
+    .map(|(i, (_, target, _, methods, _, _))| {
+        (
+            i,
+            Statement::Impl {
+                target: Token::Identifier(target.into()),
+                methods,
+            },
+        )
+    })
+}
+
+fn parse_impl_for(input: &str) -> IResult<&str, Statement> {
     tuple((
         wrap("impl"),
         _parse_identifier,
@@ -185,7 +275,7 @@ fn parse_impl(input: &str) -> IResult<&str, Expr> {
     .map(|(i, (_, t, _, s))| {
         (
             i,
-            Expr::Impl {
+            Statement::ImplFor {
                 name: Token::Identifier(t.into()),
                 target: Token::Identifier(s.into()),
             },
@@ -193,7 +283,7 @@ fn parse_impl(input: &str) -> IResult<&str, Expr> {
     })
 }
 
-fn parse_trait(input: &str) -> IResult<&str, Expr> {
+fn parse_trait(input: &str) -> IResult<&str, Statement> {
     tuple((
         wrap("trait"),
         _parse_identifier,
@@ -205,7 +295,7 @@ fn parse_trait(input: &str) -> IResult<&str, Expr> {
     .map(|(i, (_, name, _, methods, _, _))| {
         (
             i,
-            Expr::Trait {
+            Statement::Trait {
                 name: Token::Identifier(name.into()),
                 methods,
             },
@@ -220,14 +310,14 @@ fn parse_scope(input: &str) -> IResult<&str, Expr> {
 fn parse_if(input: &str) -> IResult<&str, Expr> {
     let mut branches: Vec<(Expr, Vec<Expr>)> = vec![];
 
-    let (mut next, main) = tuple((wrap("if"), parse, wrap("{"), body(), wrap("}")))(input)
+    let (mut next, main) = tuple((wrap("if"), _parse_expr, wrap("{"), body(), wrap("}")))(input)
         .map(|(i, (_, cond, _, b, _))| (i, (cond, b)))?;
     branches.push(main);
 
     while let Ok((more, elif)) = tuple((
         wrap("else"),
         wrap("if"),
-        parse,
+        _parse_expr,
         wrap("{"),
         body(),
         wrap("}"),
@@ -254,7 +344,7 @@ fn parse_loop(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_while(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("while"), parse, wrap("{"), body(), wrap("}")))(input).map(
+    tuple((wrap("while"), _parse_expr, wrap("{"), body(), wrap("}")))(input).map(
         |(i, (_, value, _, body, _))| {
             (
                 i,
@@ -291,7 +381,7 @@ fn parse_func(input: &str) -> IResult<&str, Expr> {
 fn parse_assignment(input: &str) -> IResult<&str, Expr> {
     let (mut input, mut left) = alt((parse_kw_deref, parse_access))(input)?; //access
     while let Ok((next, _)) = tuple((char('='), peek(not(char('=')))))(input) {
-        let (i, right) = parse(next)?;
+        let (i, right) = _parse_expr(next)?;
         input = i;
         left = Expr::Assign {
             target: Box::new(left),
@@ -304,7 +394,7 @@ fn parse_assignment(input: &str) -> IResult<&str, Expr> {
 fn parse_collection_assignment(input: &str) -> IResult<&str, Expr> {
     let (mut input, mut left) = alt((parse_kw_deref, parse_access))(input)?; //access
     while let Ok((next, _)) = char(':')(input) {
-        let (i, right) = parse(next)?;
+        let (i, right) = _parse_expr(next)?;
         input = i;
         left = Expr::Assign {
             target: Box::new(left),
@@ -391,7 +481,7 @@ fn parse_mult(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_args(input: &str) -> IResult<&str, Vec<Expr>> {
-    separated_list0(tuple((wrap(","),)), parse)(input)
+    separated_list0(tuple((wrap(","),)), _parse_expr)(input)
 }
 
 fn parse_call(input: &str) -> IResult<&str, Expr> {
@@ -444,7 +534,7 @@ fn parse_access(input: &str) -> IResult<&str, Expr> {
                 }
             }
             Some('[') => {
-                let (i, right) = delimited(skippables, parse, skippables)(&input[1..])
+                let (i, right) = delimited(skippables, _parse_expr, skippables)(&input[1..])
                     .unwrap_or((&input[1..], Expr::Term(Token::Nil)));
                 input = char(']')(i)?.0;
                 left = Expr::Access {
@@ -477,6 +567,7 @@ fn parse_inc_dec(input: &str) -> IResult<&str, Expr> {
 
 fn parse_term(input: &str) -> IResult<&str, Expr> {
     alt((
+        parse_struct_create,
         parse_inc_dec,
         parse_continue,
         parse_func,
@@ -499,7 +590,7 @@ fn parse_continue(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_unary(input: &str) -> IResult<&str, Expr> {
-    tuple((alt((wrap("!"), wrap("-"))), parse))(input).map(|(i, (op, value))| {
+    tuple((alt((wrap("!"), wrap("-"))), _parse_expr))(input).map(|(i, (op, value))| {
         (
             i,
             Expr::Unary {
@@ -515,16 +606,16 @@ fn parse_unary(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_grouped(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("("), parse, wrap(")")))(input).map(|(i, (_, o, _))| (i, o))
+    tuple((wrap("("), _parse_expr, wrap(")")))(input).map(|(i, (_, o, _))| (i, o))
 }
 
 fn parse_break(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("break"), opt(parse)))(input)
+    tuple((wrap("break"), opt(_parse_expr)))(input)
         .map(|(i, (_, o))| (i, Expr::Break(o.unwrap_or(Expr::Nil).into())))
 }
 
 fn parse_return(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("return"), parse))(input).map(|(i, (_, o))| (i, Expr::Return(o.into())))
+    tuple((wrap("return"), opt(_parse_expr)))(input).map(|(i, (_, o))| (i, Expr::Return(o.unwrap_or(Expr::Nil).into())))
 }
 
 // fn parse_ref(input: &str) -> IResult<&str, Expr> {
@@ -532,21 +623,27 @@ fn parse_return(input: &str) -> IResult<&str, Expr> {
 // }
 
 fn parse_deref(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("*"), parse))(input).map(|(i, (_, o))| (i, Expr::Deref(o.into())))
+    tuple((wrap("*"), _parse_expr))(input).map(|(i, (_, o))| (i, Expr::Deref(o.into())))
 }
 
-fn _parse_identifier(input: &str) -> IResult<&str, &str> {
-    recognize(many1(pair(alpha1, many0(one_of("_")))))(input)
+fn _parse_identifier(input: &str) -> IResult<&str, String> {
+    let (o, parsed) = many1(
+        alt((
+            alpha1,
+            tag("_")
+        ))
+    )(input)?;
+    Ok((o, parsed.join("")))
 }
 
 fn parse_identifier(input: &str) -> IResult<&str, Expr> {
-    _parse_identifier(input).map(|(i, o)| (i, Expr::Term(o.into())))
+    _parse_identifier(input).map(|(i, o)| (i, Expr::Term((o.as_str()).into())))
 }
 
 fn parse_sequence(input: &str) -> IResult<&str, Expr> {
     tuple((
         char('['),
-        separated_list0(tuple((skippables, char(','), skippables)), parse_call),
+        separated_list0(tuple((skippables, char(','), skippables)), parse_access),
         opt(wrap(",")),
         char(']'),
     ))(input)

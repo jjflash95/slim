@@ -1,8 +1,8 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::runtime::object::ObjectRef;
+use crate::{runtime::object::ObjectRef, parser::Token};
 
-use super::object::{TraitDef, TraitImpl, Type};
+use super::object::{TraitDef, TraitImpl, Type, StructProps};
 
 #[derive(Debug, Default)]
 pub struct Scope {
@@ -11,6 +11,7 @@ pub struct Scope {
     pub store: HashMap<String, ObjectRef>,
     pub trait_defs: HashMap<String, TraitDef>,
     pub trait_impls: HashMap<Type, TraitImpl>,
+    pub struct_defs: HashMap<String, StructProps>,
 }
 
 impl Scope {
@@ -30,6 +31,19 @@ impl Scope {
             return Some(Rc::clone(v));
         } else if let Some(parent) = self.get_parent() {
             return parent.get(key);
+        }
+        None
+    }
+
+    pub fn add_struct(&mut self, name: String, props: StructProps) {
+        self.struct_defs.insert(name, props);
+    }
+
+    pub fn get_struct_def(&mut self, name: &str) -> Option<StructProps> {
+        if let Some(s) = self.struct_defs.get(name) {
+            return Some(s.clone())
+        } else if let Some(parent) = self.get_parent() {
+            return parent.get_struct_def(name)
         }
         None
     }

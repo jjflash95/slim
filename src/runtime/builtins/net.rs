@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::{
@@ -5,66 +6,62 @@ use std::{
     io::{Read, Write},
     net::TcpListener,
 };
-
+use std::cell::RefCell;
+use crate::nil;
 use crate::runtime::builtins::next_arg;
 use crate::runtime::builtins::BuiltinFunc;
-use crate::runtime::scope::RuntimeScope;
-use crate::runtime::{EResult, RuntimeError, Value};
+use crate::runtime::object::{ObjectRef, ToObject, Object};
+use crate::runtime::scope::Scope;
+use crate::runtime::{EResult, RuntimeError};
 
-pub fn socket(args: &mut Vec<Value>, _: RuntimeScope) -> EResult {
-    let host: String = next_arg(args, "host")?.try_into()?;
-    let port: i128 = next_arg(args, "port")?.try_into()?;
+
+pub fn listen(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
+    let host: String = next_arg(&mut args, "host")?.object().try_into()?;
+    let port: i128 = next_arg(&mut args, "port")?.object().try_into()?;
     let listener = TcpListener::bind((host.as_str(), port as u16)).unwrap();
 
-    let accept: BuiltinFunc = Box::new(move |_, _| {
-        if let Ok((stream, _)) = listener.accept() {
-            let sm = Arc::new(Mutex::new(stream));
-            let reader = Arc::clone(&sm);
-            let writer = Arc::clone(&sm);
-            let closer = Arc::clone(&sm);
-            let listen: BuiltinFunc = Box::new(move |_, _| {
-                let mut buffer = [0; 1024];
-                reader.lock().unwrap().read_exact(&mut buffer).unwrap();
-                return Ok(Value::StringLiteral(
-                    String::from_utf8_lossy(&buffer[..]).into(),
-                ));
-            });
-
-            let write: BuiltinFunc = Box::new(move |args, _| {
-                let t: String = args.remove(0).try_into()?;
-                let mut buf = t.as_bytes();
-                while !buf.is_empty() {
-                    let res = writer.lock().unwrap().write(buf);
-                    match res {
-                        Ok(0) => break,
-                        Ok(n) => buf = &buf[n..],
-                        Err(_) => return Err(RuntimeError("Failed socket.write".to_owned())),
-                    };
-                }
-                Ok(Value::Nil)
-            });
-
-            let close: BuiltinFunc = Box::new(move |_, _| {
-                closer
-                    .lock()
-                    .unwrap()
-                    .shutdown(std::net::Shutdown::Both)
-                    .unwrap();
-                Ok(Value::Nil)
-            });
-
-            let fields = HashMap::from([
-                ("listen".to_string(), Value::Builtin(Rc::new(listen))),
-                ("write".to_string(), Value::Builtin(Rc::new(write))),
-                ("close".to_string(), Value::Builtin(Rc::new(close))),
-            ]);
-            return Ok(Value::Collection(fields));
+    if let Ok((stream, _)) = listener.accept() {
+        let sm = Rc::new(RefCell::new(stream));
+        let reader = Rc::clone(&sm);
+        let writer = Rc::clone(&sm);
+        let closer = Rc::clone(&sm);
+        let read = move |_: &mut Scope, _| {
+            let buffer = &mut [0; 1024];
+            (*reader).borrow_mut().read(buffer).unwrap();
+            return Ok(Object::Str(
+                String::from_utf8_lossy(&buffer[..]).into(),
+            ).into());
         };
 
-        Ok(Value::Nil)
-    });
+        let write = move |_: &mut Scope, mut args: Vec<ObjectRef>| {
+            let t: String = args.remove(0).object().try_into()?;
+            let mut buf = t.as_bytes();
+            while !buf.is_empty() {
+                let res = (*writer).borrow_mut().write(buf);
+                match res {
+                    Ok(0) => break,
+                    Ok(n) => buf = &buf[n..],
+                    Err(_) => return Err(RuntimeError("Failed socket.write".to_owned())),
+                };
+            }
+            nil!()
+        };
 
-    let fields = HashMap::from([("accept".to_string(), Value::Builtin(Rc::new(accept)))]);
+        let close = move |_: &mut Scope, _| {
+            (*closer)
+                .borrow_mut()
+                .shutdown(std::net::Shutdown::Both)
+                .unwrap();
+            nil!()
+        };
 
-    Ok(Value::Collection(fields))
+        let fields = HashMap::from([
+            ("read".to_string(), Object::Builtin(BuiltinFunc(Rc::new(Box::new(read)))).into()),
+            ("write".to_string(), Object::Builtin(BuiltinFunc(Rc::new(Box::new(write)))).into()),
+            ("close".to_string(), Object::Builtin(BuiltinFunc(Rc::new(Box::new(close)))).into()),
+        ]);
+        return Ok(Object::Collection(fields.into()).into());
+    } else {
+        nil!()
+    }
 }

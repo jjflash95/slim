@@ -1,4 +1,5 @@
 use crate::parser;
+use crate::parser::ParseResult;
 use crate::runtime;
 use crate::runtime::builtins;
 use crate::runtime::scope::Scope;
@@ -23,11 +24,18 @@ pub fn interactive() -> Result<(), i32> {
 
             match parser::parse(&input) {
                 Ok((_, ast)) => {
-                    let r = runtime::evaluate(&mut scope, ast);
-
-                    if let Err(RuntimeError(e)) = r {
-                        handle_runtime_err("".to_string(), " ", e)
-                    }
+                    let r = match ast {
+                        ParseResult::Statement(stm) => {
+                            if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, stm) {
+                                handle_runtime_err("".to_string(), " ", e)
+                            }
+                        },
+                        ParseResult::Expression(e) => {
+                            if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, e) {
+                                handle_runtime_err("".to_string(), " ", e)
+                            }
+                        },
+                    };
                 }
                 Err(e) => {
                     eprintln!("[ParseError] {:?}", e);
@@ -54,16 +62,24 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
         match parser::parse(input) {
             Ok((i, ast)) => {
                 input = i;
-                if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, ast) {
-                    handle_runtime_err(p, i, e);
-                    return Err(1);
-                }
+                let r = match ast {
+                    ParseResult::Statement(stm) => {
+                        if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, stm) {
+                            handle_runtime_err("".to_string(), " ", e)
+                        }
+                    },
+                    ParseResult::Expression(e) => {
+                        if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, e) {
+                            handle_runtime_err("".to_string(), " ", e)
+                        }
+                    },
+                };
             }
             Err(nom::Err::Error(e)) => {
                 handle_parse_err(p, e);
                 return Err(1);
             }
-            e => {
+            Err(e) => {
                 eprintln!("[ParseError]: {:?}", e);
                 return Err(2);
             }
@@ -114,6 +130,7 @@ fn handle_runtime_err(p: String, remaining: &str, e: String) {
 }
 
 fn handle_parse_err(p: String, e: nom::error::Error<&str>) {
+    dbg!(&e);
     if let Some((line, col)) = find_error_on_string(&p, e.input) {
         let fail_line = p.lines().collect::<Vec<&str>>()[line - 1];
         let mut indicator: String = " ".repeat(col - 1);

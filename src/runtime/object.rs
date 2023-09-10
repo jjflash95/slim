@@ -1,5 +1,6 @@
 use core::fmt;
 use std::fmt::Write;
+use std::hash::Hash;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::parser::{Expr, Token};
@@ -8,14 +9,18 @@ use crate::runtime::scope::Scope;
 use crate::runtime::EResult;
 use crate::runtime::RuntimeError;
 
+
+pub type BuiltinClosure = Rc<Box<dyn Fn(&mut Scope, Vec<ObjectRef>) -> EResult<ObjectRef>>>;
+
 #[derive(Clone)]
-pub struct BuiltinFunc(pub BuiltinPtr);
+pub struct BuiltinFunc(pub BuiltinClosure);
 
 pub type ObjectRef = Rc<RefCell<Object>>;
 
 pub type Ord = std::cmp::Ordering;
 
 pub type TraitImpl = HashMap<String, ObjectRef>;
+pub type StructProps = Vec<String>;
 
 #[derive(Clone, Debug)]
 pub struct TraitDef {
@@ -52,6 +57,11 @@ pub enum Object {
         locals: Option<HashMap<String, ObjectRef>>,
         body: Vec<Expr>,
     },
+    Struct {
+        name: String,
+        rules: Vec<String>,
+        props: HashMap<String, ObjectRef>
+    }
 }
 
 impl PartialEq for Object {
@@ -162,6 +172,7 @@ impl Object {
             Object::Sequence(..) => Type::Sequence,
             Object::Builtin(..) => Type::Builtin,
             Object::Func { .. } => Type::Func,
+            Object::Struct { name, .. } => Type::Struct(name.to_string())
         }
     }
 
@@ -176,7 +187,7 @@ impl Object {
             traits
                 .get(&name)
                 .cloned()
-                .ok_or(RuntimeError("did not found trait".into()))
+                .ok_or(RuntimeError(format!("did not found trait for {:?}", field)))
         } else {
             rt_err!("type {:?} has no field {:?}", self._type(), field)
         }
@@ -204,6 +215,7 @@ impl Object {
             Object::Sequence(items) => !items.is_empty(),
             Object::Func { .. } => true,
             Object::Builtin(..) => true,
+            Object::Struct{ .. } => true,
         }
     }
 
@@ -226,12 +238,25 @@ impl Object {
             Object::Collection(fields) => match field {
                 Object::Str(key) => {
                     let item = fields
+                        .entry(key)
+                        .or_insert_with(|| Object::Collection(HashMap::default()).into());
+                    return Ok(Rc::clone(item));
+                }
+                _ => {}
+            },
+            Object::Struct { name, rules, props } => match field {
+                Object::Str(key) => {
+                    if !rules.contains(&key) {
+                        rt_err!("Struct {} has no field {}", name, key)?
+                    };
+
+                    let item = props
                         .get(&key)
                         .ok_or_else(|| RuntimeError(format!("No field named: {}", key)))?;
                     return Ok(Rc::clone(item));
                 }
                 _ => {}
-            },
+            }
             _ => {}
         };
 

@@ -1,15 +1,45 @@
+mod net;
+
 use std::cell::RefCell;
 use std::time::SystemTime;
 use std::{collections::HashMap, io::Write, rc::Rc};
 
+use crate::runtime::object::BuiltinClosure;
 use crate::{nil, rt_err, runtime::RuntimeError};
 
+use net::listen;
 use super::object::ToObject;
 use super::{
-    object::{BuiltinFunc, BuiltinPtr, Object, ObjectRef},
+    object::{BuiltinFunc, Object, ObjectRef},
     scope::Scope,
     EResult,
 };
+
+
+pub fn split(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
+    let arg = next_arg(&mut args, "string")?;
+    let sep: String = next_arg(&mut args, "separator")
+        .unwrap_or_else(|_| Rc::new(RefCell::new(Object::Str("".to_string())))).object().try_into()?;
+
+    Ok(match arg.object() {
+        Object::Str(s) => match sep.as_str() {
+            "" => Object::Sequence(
+                s.chars()
+                    .map(|c| Object::Str(c.to_string()).into())
+                    .collect(),
+            ).into(),
+            sep => Object::Sequence(
+                s.split(sep)
+                    .map(|s| Object::Str(s.to_string()).into())
+                    .collect(),
+            ).into(),
+        },
+        _ => Err(RuntimeError(format!(
+            "Expected string but got <{:?}> instead",
+            arg
+        )))?,
+    })
+}
 
 fn pop(_: &mut Scope, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     if args.len() != 1 {
@@ -143,21 +173,27 @@ fn next_arg(args: &mut Vec<Rc<RefCell<Object>>>, arg: &str) -> EResult<ObjectRef
     }
 }
 
-fn get_builtins() -> Vec<(&'static str, BuiltinPtr)> {
+fn get_builtins() -> Vec<(&'static str, BuiltinClosure)> {
     vec![
-        ("to_string", to_string),
-        ("lowercase", lowercase),
-        ("uppercase", uppercase),
-        ("concat", concat),
-        ("len", len),
-        ("slice", slice),
-        ("rand", rand),
-        ("input", input),
-        ("clear", clear),
-        ("dbg", dbg),
-        ("print", print),
-        ("pop", pop),
+        ("listen", wrap(listen)),
+        ("to_string", wrap(to_string)),
+        ("lowercase", wrap(lowercase)),
+        ("uppercase", wrap(uppercase)),
+        ("split", wrap(split)),
+        ("concat", wrap(concat)),
+        ("len", wrap(len)),
+        ("slice", wrap(slice)),
+        ("rand", wrap(rand)),
+        ("input", wrap(input)),
+        ("clear", wrap(clear)),
+        ("dbg", wrap(dbg)),
+        ("print", wrap(print)),
+        ("pop", wrap(pop)),
     ]
+}
+
+pub fn wrap(f: fn(&mut Scope, Vec<ObjectRef>) -> EResult<ObjectRef>) -> BuiltinClosure {
+    Rc::new(Box::new(move |s, args| { f(s, args) }))
 }
 
 pub fn default() -> HashMap<&'static str, ObjectRef> {

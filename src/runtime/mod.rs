@@ -7,11 +7,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::parser::{Expr, Token};
+use crate::parser::{Expr, Token, Statement};
 use crate::runtime::object::{ObjectRef, TraitDef};
 use crate::runtime::scope::Scope;
 
-use self::object::{BuiltinFunc, Object, ToObject};
+use self::object::{BuiltinFunc, Object, ToObject, StructProps};
 use self::operations::{BinOps, UnaryOps};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -54,11 +54,19 @@ pub enum Bubble {
 #[cfg(test)]
 mod tests;
 
+pub fn evaluate_stmt(scope: &mut Scope, stm: Statement) -> EResult<()> {
+    match stm {
+        Statement::DefStruct { name, props } => eval_def_struct(scope, name, props),
+        Statement::ImplFor { name, target } => eval_impl_for(scope, name, target),
+        Statement::Trait { name, methods } => eval_declare_trait(scope, name, methods),
+        Statement::Impl { target, methods } => eval_impl(scope, target, methods),
+    }
+}
+
 pub fn evaluate(scope: &mut Scope, expr: Expr) -> EResult<ObjectRef> {
     match expr {
         Expr::Nil => nil!(),
-        Expr::Impl { name, target } => eval_impl(scope, name, target),
-        Expr::Trait { name, methods } => eval_declare_trait(scope, name, methods),
+        Expr::Struct { name, props } => eval_struct(scope, name, props),
         Expr::Pipe { parent, child } => eval_pipe(scope, *parent, *child),
         Expr::Call { target, args } => eval_call(scope, *target, args),
         Expr::Func { name, params, body } => eval_func(scope, name, params, body),
@@ -105,14 +113,46 @@ fn eval_self(scope: &mut Scope) -> EResult<ObjectRef> {
         .ok_or(RuntimeError("No self in scope".into()))
 }
 
-fn eval_impl(scope: &mut Scope, name: Token, target: Token) -> EResult<ObjectRef> {
+fn eval_struct(scope: &mut Scope, name: String, props: Vec<Expr>) -> EResult<ObjectRef> {
+    let rules = scope.get_struct_def(&name).ok_or(RuntimeError(format!("Struct {} does not exist", name)))?;
+    let props = props
+    .into_iter()
+    .map(|e| {
+        if let Expr::Assign { target, value } = e {
+            if let Expr::Term(Token::Identifier(name)) = *target {
+                return Ok((name, evaluate(scope, *value)?));
+            }
+            rt_err!("Expected term inside collection but found: {:?}", target)?
+        } else {
+            rt_err!("Expected assign inside collection, found: {:?}", e)?
+        }
+    })
+    .collect::<EResult<HashMap<String, ObjectRef>>>()?;
+    for prop in &rules {
+        if !props.contains_key(prop) {
+            rt_err!("Missing field {} for struct {}", prop, name)?
+        }
+    }
+    Ok(Object::Struct {
+        name,
+        rules,
+        props,
+    }.into())
+}
+
+fn eval_def_struct(scope: &mut Scope, name: String, props: StructProps) -> EResult<()> {
+    scope.add_struct(name, props);
+    Ok(())
+}
+
+fn eval_impl_for(scope: &mut Scope, name: Token, target: Token) -> EResult<()> {
     match (name, target) {
         (Token::Identifier(name), Token::Identifier(target)) => {
             let def = scope
                 .trait_defs
                 .get(&name)
                 .cloned()
-                .ok_or(RuntimeError("No trait exists".into()))?;
+                .ok_or(RuntimeError(format!("impl {}: trait {} does not exist", target, name)))?;
             let mut methods = HashMap::new();
             for f in def.methods {
                 if let Expr::Func {
@@ -128,13 +168,35 @@ fn eval_impl(scope: &mut Scope, name: Token, target: Token) -> EResult<ObjectRef
                 }
             }
             scope.add_trait(target.into(), methods);
-            nil!()
+            Ok(())
         }
         (n, t) => rt_err!("Cannot impl {:?} for {:?}", n, t),
     }
 }
 
-fn eval_declare_trait(scope: &mut Scope, name: Token, methods: Vec<Expr>) -> EResult<ObjectRef> {
+fn eval_impl(scope: &mut Scope, target: Token, _methods: Vec<Expr>) -> EResult<()> {
+    if let Token::Identifier(target) = target {
+        let mut methods = HashMap::new();
+        for f in _methods {
+            if let Expr::Func {
+                name, params, body, ..
+            } = f
+            {
+                let name = name.ok_or(RuntimeError(
+                    "Cannot implement anonymous trait functions".into(),
+                ))?;
+                methods.insert(name, _eval_func(scope, None, params, body)?.1);
+            } else {
+                rt_err!("Found non-function in trait impl")?
+            }
+        }
+        scope.add_trait(target.into(), methods);
+        return Ok(());
+    }
+    rt_err!("Cannot eval direct impl")
+}
+
+fn eval_declare_trait(scope: &mut Scope, name: Token, methods: Vec<Expr>) -> EResult<()> {
     if let Token::Identifier(name) = name {
         for m in &methods {
             if !matches!(m, Expr::Func { .. }) {
@@ -142,7 +204,7 @@ fn eval_declare_trait(scope: &mut Scope, name: Token, methods: Vec<Expr>) -> ERe
             }
         }
         scope.trait_defs.insert(name, TraitDef { methods });
-        return nil!();
+        return Ok(());
     }
     rt_err!("Cannot eval trait")
 }
