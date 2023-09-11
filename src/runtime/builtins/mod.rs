@@ -196,7 +196,7 @@ fn get_builtins() -> Vec<(&'static str, BuiltinClosure)> {
 }
 
 pub fn wrap(f: fn(&mut Scope, Vec<ObjectRef>) -> EResult<ObjectRef>) -> BuiltinClosure {
-    Rc::new(Box::new(move |s, args| f(s, args)))
+    Rc::new(Box::new(f))
 }
 
 pub fn default() -> HashMap<&'static str, ObjectRef> {
