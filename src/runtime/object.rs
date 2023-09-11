@@ -307,6 +307,22 @@ impl Object {
             Object::Float(n) => n.to_string(),
             Object::Builtin { .. } => "[builtin]()".to_string(),
             Object::Nil => "nil".into(),
+            Object::Struct { name, props, .. } => {
+                let mut s = String::new();
+                let _ = write!(s, "{}{} {{", "".repeat(indent as usize), name);
+                let _ = writeln!(s, "{}{{", "".repeat(indent as usize));
+                for (key, value) in props {
+                    let _ = writeln!(
+                        s,
+                        "{}  {}: {}",
+                        "  ".repeat(indent as usize),
+                        key,
+                        value.borrow().format(indent + 1)
+                    );
+                }
+                let _ = write!(s, "{}}}", "  ".repeat(indent as usize));
+                s
+            },
             _ => "".into(),
         }
     }

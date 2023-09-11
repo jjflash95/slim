@@ -553,6 +553,16 @@ fn eval_call_func(
                 Bubble::Continue => rt_err!("Cannot call continue outside loop")?,
                 _ => {} // eval & break get ignored
             },
+            Expr::While { pin, body } => match eval_while_with(
+                &mut inner,
+                *pin,
+                body,
+                &mut vec![Interrupts::Return],
+            )? {
+                Bubble::Return(v) => return Ok(v),
+                Bubble::Continue => rt_err!("Cannot call continue outside loop")?,
+                _ => {} // eval & break get ignored
+            },
             Expr::For {
                 pin,
                 iterable,
