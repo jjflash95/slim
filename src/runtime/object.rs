@@ -308,7 +308,7 @@ impl Object {
             Object::Nil => "nil".into(),
             Object::Struct { name, props, .. } => {
                 let mut s = String::new();
-                let _ = write!(s, "{}{} {{", "".repeat(indent as usize), name);
+                let _ = write!(s, "{}{} ", "".repeat(indent as usize), name);
                 let _ = writeln!(s, "{}{{", "".repeat(indent as usize));
                 for (key, value) in props {
                     let _ = writeln!(
@@ -332,8 +332,6 @@ impl fmt::Display for Object {
         write!(f, "{}", &self.format(0))
     }
 }
-
-pub type BuiltinPtr = fn(&mut Scope, Vec<ObjectRef>) -> EResult<ObjectRef>;
 
 pub trait ToObject {
     fn object(&self) -> Object;

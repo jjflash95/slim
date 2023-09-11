@@ -1,47 +1,48 @@
 # SLIM
 
-Rust for dummies
+An interpreter built and inspired in pure rust
 
-### Install
+### Build & Install
 
+assuming you already have rust installed
 ```bash
 $ cd project/root
 $ cargo build --release
 $ export PATH="$(pwd)/target/release/:$PATH"
 $ source ~/.bashrc
+$ slim
+> print("Hello World")
+Hello World
 ```
 
 ### Usage
-
-to run a file:
 ```bash
 $ echo "print('Hello world')" > hello.sm
 $ slim hello.sm
 $ Hello world
 ```
-interactive:
-```bash
-$ slim
-```
 
 ### Examples
-Linked list
+Cons list
 ```rust
-struct List { head }
+struct Cons { head }
 struct Node { value, next }
 
-impl List {
+impl Cons {
 	fn add(value) {
 		curr = self.head
-		while curr.next != nil {
+		return loop {
+			if curr.next == nil {
+				curr.next = new Node { value: value, next: nil }
+				break self
+			}
 			curr = curr.next
 		}
-		curr.next = new Node { value: value, next: nil }
 	}
 }
 
-new_list = fn() {
-	return new List {
+list = fn() {
+	return new Cons {
 		head: new Node {
 			value: 1,
 			next: nil
@@ -49,10 +50,10 @@ new_list = fn() {
 	}
 }
 
-list = new_list()
-list.add(2)
-list.add(3)
-
-print(list)
-
+print(
+	list()
+		.add(2)
+		.add(3)
+		.add(4)
+)
 ```
