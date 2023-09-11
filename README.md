@@ -1,6 +1,8 @@
 # SLIM
 
-An interpreter built and inspired in pure rust
+An interpreter built and inspired in pure rust.
+
+Working [examples](https://github.com/jjflash95/slim-examples)...
 
 ### Build & Install
 
@@ -51,9 +53,6 @@ list = fn() {
 }
 
 print(
-    list()
-        .add(2)
-        .add(3)
-        .add(4)
+    list().add(2).add(3).add(4)
 )
 ```
