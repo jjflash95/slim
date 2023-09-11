@@ -1,10 +1,10 @@
 use nom::branch::alt;
 use nom::bytes::complete::{take_while, tag};
-use nom::character::complete::{alpha1, one_of, anychar, alphanumeric1};
-use nom::combinator::{not, opt, peek, recognize, all_consuming, verify};
-use nom::multi::{fold_many0, many0, many1, separated_list0, many0_count};
+use nom::character::complete::{alpha1};
+use nom::combinator::{not, opt, peek};
+use nom::multi::{fold_many0, many0, many1, separated_list0};
 use nom::number::complete::recognize_float_parts;
-use nom::sequence::{delimited, pair, tuple, preceded};
+use nom::sequence::{delimited, tuple};
 use nom::IResult;
 
 #[cfg(test)]
@@ -45,6 +45,7 @@ pub enum Token {
     _Self,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ParseResult {
     Statement(Statement),
     Expression(Expr),
@@ -222,7 +223,7 @@ fn parse_struct_create(input: &str) -> IResult<&str, Expr> {
         opt(wrap(",")),
         wrap("}"),
     ))(input)
-    .map(|(i, (_, name, _, props, _, _))| (i, Expr::Struct { name: name.into(), props }))
+    .map(|(i, (_, name, _, props, _, _))| (i, Expr::Struct { name, props }))
 }
 
 fn parse_struct_def(input: &str) -> IResult<&str, Statement> {
@@ -238,8 +239,8 @@ fn parse_struct_def(input: &str) -> IResult<&str, Statement> {
         (
             i,
             Statement::DefStruct {
-                name: name.into(),
-                props: props.into_iter().map(|p| p.into()).collect(),
+                name,
+                props: props.into_iter().collect(),
             },
         )
     })
@@ -258,7 +259,7 @@ fn parse_impl(input: &str) -> IResult<&str, Statement> {
         (
             i,
             Statement::Impl {
-                target: Token::Identifier(target.into()),
+                target: Token::Identifier(target),
                 methods,
             },
         )
@@ -276,8 +277,8 @@ fn parse_impl_for(input: &str) -> IResult<&str, Statement> {
         (
             i,
             Statement::ImplFor {
-                name: Token::Identifier(t.into()),
-                target: Token::Identifier(s.into()),
+                name: Token::Identifier(t),
+                target: Token::Identifier(s),
             },
         )
     })
@@ -296,7 +297,7 @@ fn parse_trait(input: &str) -> IResult<&str, Statement> {
         (
             i,
             Statement::Trait {
-                name: Token::Identifier(name.into()),
+                name: Token::Identifier(name),
                 methods,
             },
         )

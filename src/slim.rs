@@ -24,7 +24,7 @@ pub fn interactive() -> Result<(), i32> {
 
             match parser::parse(&input) {
                 Ok((_, ast)) => {
-                    let r = match ast {
+                    match ast {
                         ParseResult::Statement(stm) => {
                             if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, stm) {
                                 handle_runtime_err("".to_string(), " ", e)
@@ -62,7 +62,7 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
         match parser::parse(input) {
             Ok((i, ast)) => {
                 input = i;
-                let r = match ast {
+                match ast {
                     ParseResult::Statement(stm) => {
                         if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, stm) {
                             handle_runtime_err("".to_string(), " ", e)

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{runtime::object::ObjectRef, parser::Token};
+use crate::{runtime::object::ObjectRef};
 
 use super::object::{TraitDef, TraitImpl, Type, StructProps};
 

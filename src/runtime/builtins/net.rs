@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+
 use std::{
     collections::HashMap,
     io::{Read, Write},
@@ -60,7 +60,7 @@ pub fn listen(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
             ("write".to_string(), Object::Builtin(BuiltinFunc(Rc::new(Box::new(write)))).into()),
             ("close".to_string(), Object::Builtin(BuiltinFunc(Rc::new(Box::new(close)))).into()),
         ]);
-        return Ok(Object::Collection(fields.into()).into());
+        Ok(Object::Collection(fields).into())
     } else {
         nil!()
     }
