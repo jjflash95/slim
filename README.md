@@ -42,12 +42,12 @@ impl Cons {
 }
 
 list = fn() {
-	return new Cons {
-		head: new Node {
-			value: 1,
-			next: nil
-		}
-	}
+    return new Cons {
+        head: new Node {
+            value: 1,
+            next: nil
+        }
+    }
 }
 
 print(
