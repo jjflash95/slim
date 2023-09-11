@@ -24,7 +24,7 @@ $ Hello world
 
 ### Examples
 Cons list
-```rust
+```javascript
 struct Cons { head }
 struct Node { value, next }
 
