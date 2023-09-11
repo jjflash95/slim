@@ -24,21 +24,21 @@ $ Hello world
 
 ### Examples
 Cons list
-```javascript
+```rust
 struct Cons { head }
 struct Node { value, next }
 
 impl Cons {
-	fn add(value) {
-		curr = self.head
-		return loop {
-			if curr.next == nil {
-				curr.next = new Node { value: value, next: nil }
-				break self
-			}
-			curr = curr.next
-		}
-	}
+    fn add(value) {
+        curr = self.head
+        return loop {
+            if curr.next == nil {
+                curr.next = new Node { value: value, next: nil }
+                break self
+            }
+            curr = curr.next
+        }
+    }
 }
 
 list = fn() {
@@ -51,9 +51,9 @@ list = fn() {
 }
 
 print(
-	list()
-		.add(2)
-		.add(3)
-		.add(4)
+    list()
+        .add(2)
+        .add(3)
+        .add(4)
 )
 ```
