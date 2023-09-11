@@ -9,7 +9,6 @@ use crate::runtime::scope::Scope;
 use crate::runtime::EResult;
 use crate::runtime::RuntimeError;
 
-
 pub type BuiltinClosure = Rc<Box<dyn Fn(&mut Scope, Vec<ObjectRef>) -> EResult<ObjectRef>>>;
 
 #[derive(Clone)]
@@ -60,8 +59,8 @@ pub enum Object {
     Struct {
         name: String,
         rules: Vec<String>,
-        props: HashMap<String, ObjectRef>
-    }
+        props: HashMap<String, ObjectRef>,
+    },
 }
 
 impl PartialEq for Object {
@@ -172,7 +171,7 @@ impl Object {
             Object::Sequence(..) => Type::Sequence,
             Object::Builtin(..) => Type::Builtin,
             Object::Func { .. } => Type::Func,
-            Object::Struct { name, .. } => Type::Struct(name.to_string())
+            Object::Struct { name, .. } => Type::Struct(name.to_string()),
         }
     }
 
@@ -215,7 +214,7 @@ impl Object {
             Object::Sequence(items) => !items.is_empty(),
             Object::Func { .. } => true,
             Object::Builtin(..) => true,
-            Object::Struct{ .. } => true,
+            Object::Struct { .. } => true,
         }
     }
 
@@ -256,7 +255,7 @@ impl Object {
                     return Ok(Rc::clone(item));
                 }
                 _ => {}
-            }
+            },
             _ => {}
         };
 
@@ -322,7 +321,7 @@ impl Object {
                 }
                 let _ = write!(s, "{}}}", "  ".repeat(indent as usize));
                 s
-            },
+            }
             _ => "".into(),
         }
     }

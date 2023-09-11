@@ -1,19 +1,18 @@
 use std::borrow::BorrowMut;
 use std::rc::Rc;
 
+use crate::nil;
+use crate::runtime::builtins::next_arg;
+use crate::runtime::builtins::BuiltinFunc;
+use crate::runtime::object::{Object, ObjectRef, ToObject};
+use crate::runtime::scope::Scope;
+use crate::runtime::{EResult, RuntimeError};
+use std::cell::RefCell;
 use std::{
     collections::HashMap,
     io::{Read, Write},
     net::TcpListener,
 };
-use std::cell::RefCell;
-use crate::nil;
-use crate::runtime::builtins::next_arg;
-use crate::runtime::builtins::BuiltinFunc;
-use crate::runtime::object::{ObjectRef, ToObject, Object};
-use crate::runtime::scope::Scope;
-use crate::runtime::{EResult, RuntimeError};
-
 
 pub fn listen(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     let host: String = next_arg(&mut args, "host")?.object().try_into()?;
@@ -28,9 +27,7 @@ pub fn listen(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
         let read = move |_: &mut Scope, _| {
             let buffer = &mut [0; 1024];
             (*reader).borrow_mut().read(buffer).unwrap();
-            return Ok(Object::Str(
-                String::from_utf8_lossy(&buffer[..]).into(),
-            ).into());
+            return Ok(Object::Str(String::from_utf8_lossy(&buffer[..]).into()).into());
         };
 
         let write = move |_: &mut Scope, mut args: Vec<ObjectRef>| {
@@ -56,9 +53,18 @@ pub fn listen(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
         };
 
         let fields = HashMap::from([
-            ("read".to_string(), Object::Builtin(BuiltinFunc(Rc::new(Box::new(read)))).into()),
-            ("write".to_string(), Object::Builtin(BuiltinFunc(Rc::new(Box::new(write)))).into()),
-            ("close".to_string(), Object::Builtin(BuiltinFunc(Rc::new(Box::new(close)))).into()),
+            (
+                "read".to_string(),
+                Object::Builtin(BuiltinFunc(Rc::new(Box::new(read)))).into(),
+            ),
+            (
+                "write".to_string(),
+                Object::Builtin(BuiltinFunc(Rc::new(Box::new(write)))).into(),
+            ),
+            (
+                "close".to_string(),
+                Object::Builtin(BuiltinFunc(Rc::new(Box::new(close)))).into(),
+            ),
         ]);
         Ok(Object::Collection(fields).into())
     } else {

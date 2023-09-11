@@ -10,17 +10,35 @@ mod tests {
     #[test]
     fn test_primitives() {
         let input = "1";
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(Term(Int(1))));
+        assert_eq!(
+            parse(input).unwrap().1,
+            ParseResult::Expression(Term(Int(1)))
+        );
         let input = "69420";
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(Term(Int(69420))));
+        assert_eq!(
+            parse(input).unwrap().1,
+            ParseResult::Expression(Term(Int(69420)))
+        );
         let input = "10e2";
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(Term(Float(1000.0))));
+        assert_eq!(
+            parse(input).unwrap().1,
+            ParseResult::Expression(Term(Float(1000.0)))
+        );
         let input = "10e3";
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(Term(Float(10000.0))));
+        assert_eq!(
+            parse(input).unwrap().1,
+            ParseResult::Expression(Term(Float(10000.0)))
+        );
         let input = "10e-2";
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(Term(Float(0.1))));
+        assert_eq!(
+            parse(input).unwrap().1,
+            ParseResult::Expression(Term(Float(0.1)))
+        );
         let input = "3.1416";
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(Term(Float(3.1416))));
+        assert_eq!(
+            parse(input).unwrap().1,
+            ParseResult::Expression(Term(Float(3.1416)))
+        );
     }
 
     #[test]
@@ -94,7 +112,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "x  = true == false";
         let expected = Assign {
@@ -107,7 +125,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "x  = true != false";
         let expected = Assign {
@@ -120,7 +138,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -141,7 +159,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "x  = true && true || false";
         let expected = Assign {
@@ -159,7 +177,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -184,7 +202,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -194,7 +212,7 @@ mod tests {
             target: Term(Identifier("x".to_owned())).into(),
             value: Sequence(vec![Term(Int(1)), Term(Int(2)), Term(Int(3))]).into(),
         };
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "[1, 2, 3, [4, 5, {a: 6}]]";
         let expected = Sequence(vec![
@@ -210,7 +228,7 @@ mod tests {
                 }]),
             ]),
         ]);
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -225,7 +243,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "x  = a(1)(2)";
         let expected = Assign {
@@ -241,7 +259,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "call_func(true && false)";
         let expected = Call {
@@ -253,7 +271,7 @@ mod tests {
             }],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -264,7 +282,7 @@ mod tests {
             field: Term(StringLiteral("a".to_owned())).into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "obj.a.b";
         let expected = Access {
@@ -276,7 +294,7 @@ mod tests {
             field: Term(StringLiteral("b".to_owned())).into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "sequence[0][1]";
         let expected = Access {
@@ -287,7 +305,7 @@ mod tests {
             .into(),
             field: Term(Int(1)).into(),
         };
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "sequence[0]()[1]()";
         let expected = Call {
@@ -307,7 +325,7 @@ mod tests {
             args: vec![],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -322,7 +340,7 @@ mod tests {
             args: vec![],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "obj.a().b()";
         let expected = Call {
@@ -342,7 +360,7 @@ mod tests {
             args: vec![],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -361,7 +379,7 @@ mod tests {
             value: Term(Int(10)).into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "s[0][1]  = 20";
         let expected = Assign {
@@ -377,7 +395,7 @@ mod tests {
             value: Term(Int(20)).into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -389,7 +407,7 @@ mod tests {
             body: vec![],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "func() { x  = 1 }";
         let expected = Func {
@@ -401,7 +419,7 @@ mod tests {
             }],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "func() {
             x  = 1
@@ -422,7 +440,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "func() {
             x  = 1
@@ -448,7 +466,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "func sum(a,b) {
             return a + b
@@ -470,7 +488,7 @@ mod tests {
             )],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "x = func sum(a, b) {
             return a + b
@@ -496,7 +514,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "func sum(a, b) {
             return a + b
@@ -558,7 +576,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "s[0][1](params)";
         let expected = Call {
@@ -573,7 +591,7 @@ mod tests {
             .into(),
             args: vec![Term(Identifier("params".to_owned()))],
         };
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -589,7 +607,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "y = for value in [1,2,3] {
             x  = x + value
@@ -612,7 +630,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -623,7 +641,7 @@ mod tests {
             body: vec![],
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "y = while true {}";
         let expected = Assign {
@@ -635,7 +653,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "y = while true {
             x = x + 1
@@ -657,7 +675,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "y = while z < 10 {
             z = z + 1
@@ -684,7 +702,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "y = while z < 10 {
             z  = z + 1
@@ -726,7 +744,7 @@ mod tests {
             }
             .into(),
         };
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -740,7 +758,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "x = loop {
             counter  = counter + 1
@@ -777,7 +795,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -792,7 +810,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "x = -one";
         let expected = Assign {
@@ -804,7 +822,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -819,7 +837,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "1 & double & sub(1)";
         let expected = Pipe {
@@ -835,7 +853,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "trimmed_uppercase_str = ' this is my string\t' & trim & uppercase";
         let expected = Assign {
@@ -851,7 +869,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "hello_world = 'Hello' & push(' world') & push('!')";
         let expected = Assign {
@@ -875,7 +893,7 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -909,7 +927,7 @@ mod tests {
             },
         ]);
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "{
             x: 'string',
@@ -946,7 +964,7 @@ mod tests {
             },
         ]);
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 
     #[test]
@@ -957,7 +975,7 @@ mod tests {
             value: Deref(Term(Identifier("a".to_owned())).into()).into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
 
         let input = "b = **a";
         let expected = Assign {
@@ -965,6 +983,6 @@ mod tests {
             value: Deref(Deref(Term(Identifier("a".to_owned())).into()).into()).into(),
         };
 
-        assert_eq!(parse(input).unwrap().1,  ParseResult::Expression(expected));
+        assert_eq!(parse(input).unwrap().1, ParseResult::Expression(expected));
     }
 }

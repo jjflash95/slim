@@ -1,8 +1,8 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{runtime::object::ObjectRef};
+use crate::runtime::object::ObjectRef;
 
-use super::object::{TraitDef, TraitImpl, Type, StructProps};
+use super::object::{StructProps, TraitDef, TraitImpl, Type};
 
 #[derive(Debug, Default)]
 pub struct Scope {
@@ -41,9 +41,9 @@ impl Scope {
 
     pub fn get_struct_def(&mut self, name: &str) -> Option<StructProps> {
         if let Some(s) = self.struct_defs.get(name) {
-            return Some(s.clone())
+            return Some(s.clone());
         } else if let Some(parent) = self.get_parent() {
-            return parent.get_struct_def(name)
+            return parent.get_struct_def(name);
         }
         None
     }

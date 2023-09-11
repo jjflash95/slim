@@ -29,12 +29,12 @@ pub fn interactive() -> Result<(), i32> {
                             if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, stm) {
                                 handle_runtime_err("".to_string(), " ", e)
                             }
-                        },
+                        }
                         ParseResult::Expression(e) => {
                             if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, e) {
                                 handle_runtime_err("".to_string(), " ", e)
                             }
-                        },
+                        }
                     };
                 }
                 Err(e) => {
@@ -67,12 +67,12 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
                         if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, stm) {
                             handle_runtime_err("".to_string(), " ", e)
                         }
-                    },
+                    }
                     ParseResult::Expression(e) => {
                         if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, e) {
                             handle_runtime_err("".to_string(), " ", e)
                         }
-                    },
+                    }
                 };
             }
             Err(nom::Err::Error(e)) => {
@@ -130,7 +130,6 @@ fn handle_runtime_err(p: String, remaining: &str, e: String) {
 }
 
 fn handle_parse_err(p: String, e: nom::error::Error<&str>) {
-    dbg!(&e);
     if let Some((line, col)) = find_error_on_string(&p, e.input) {
         let fail_line = p.lines().collect::<Vec<&str>>()[line - 1];
         let mut indicator: String = " ".repeat(col - 1);

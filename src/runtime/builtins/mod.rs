@@ -7,19 +7,20 @@ use std::{collections::HashMap, io::Write, rc::Rc};
 use crate::runtime::object::BuiltinClosure;
 use crate::{nil, rt_err, runtime::RuntimeError};
 
-use net::listen;
 use super::object::ToObject;
 use super::{
     object::{BuiltinFunc, Object, ObjectRef},
     scope::Scope,
     EResult,
 };
-
+use net::listen;
 
 pub fn split(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     let arg = next_arg(&mut args, "string")?;
     let sep: String = next_arg(&mut args, "separator")
-        .unwrap_or_else(|_| Rc::new(RefCell::new(Object::Str("".to_string())))).object().try_into()?;
+        .unwrap_or_else(|_| Rc::new(RefCell::new(Object::Str("".to_string()))))
+        .object()
+        .try_into()?;
 
     Ok(match arg.object() {
         Object::Str(s) => match sep.as_str() {
@@ -27,12 +28,14 @@ pub fn split(_: &mut Scope, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
                 s.chars()
                     .map(|c| Object::Str(c.to_string()).into())
                     .collect(),
-            ).into(),
+            )
+            .into(),
             sep => Object::Sequence(
                 s.split(sep)
                     .map(|s| Object::Str(s.to_string()).into())
                     .collect(),
-            ).into(),
+            )
+            .into(),
         },
         _ => Err(RuntimeError(format!(
             "Expected string but got <{:?}> instead",
@@ -193,7 +196,7 @@ fn get_builtins() -> Vec<(&'static str, BuiltinClosure)> {
 }
 
 pub fn wrap(f: fn(&mut Scope, Vec<ObjectRef>) -> EResult<ObjectRef>) -> BuiltinClosure {
-    Rc::new(Box::new(move |s, args| { f(s, args) }))
+    Rc::new(Box::new(move |s, args| f(s, args)))
 }
 
 pub fn default() -> HashMap<&'static str, ObjectRef> {

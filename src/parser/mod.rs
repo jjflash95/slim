@@ -1,6 +1,6 @@
 use nom::branch::alt;
-use nom::bytes::complete::{take_while, tag};
-use nom::character::complete::{alpha1};
+use nom::bytes::complete::{tag, take_while};
+use nom::character::complete::alpha1;
 use nom::combinator::{not, opt, peek};
 use nom::multi::{fold_many0, many0, many1, separated_list0};
 use nom::number::complete::recognize_float_parts;
@@ -53,22 +53,10 @@ pub enum ParseResult {
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Statement {
-    Trait {
-        name: Token,
-        methods: Vec<Expr>,
-    },
-    ImplFor {
-        name: Token,
-        target: Token,
-    },
-    Impl {
-        target: Token,
-        methods: Vec<Expr>,
-    },
-    DefStruct {
-        name: String,
-        props: Vec<String>,
-    },
+    Trait { name: Token, methods: Vec<Expr> },
+    ImplFor { name: Token, target: Token },
+    Impl { target: Token, methods: Vec<Expr> },
+    DefStruct { name: String, props: Vec<String> },
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -120,7 +108,7 @@ pub enum Expr {
     },
     Struct {
         name: String,
-        props: Vec<Expr>
+        props: Vec<Expr>,
     },
     Term(Token),
     Return(Box<Expr>),
@@ -171,23 +159,16 @@ impl From<&str> for Token {
 }
 
 fn parse_statement(input: &str) -> IResult<&str, ParseResult> {
-    alt((
-        parse_trait,
-        parse_struct_def,
-        parse_impl_for,
-        parse_impl,
-    ))(input).map(|(i,o)| (i, ParseResult::Statement(o)))
+    alt((parse_trait, parse_struct_def, parse_impl_for, parse_impl))(input)
+        .map(|(i, o)| (i, ParseResult::Statement(o)))
 }
 
 pub fn parse(input: &str) -> IResult<&str, ParseResult> {
-    alt((
-        parse_statement,
-        parse_expr,
-    ))(input.trim_start())
+    alt((parse_statement, parse_expr))(input.trim_start())
 }
 
 fn parse_expr(input: &str) -> IResult<&str, ParseResult> {
-    _parse_expr(input).map(|(i,o)| (i, ParseResult::Expression(o)))
+    _parse_expr(input).map(|(i, o)| (i, ParseResult::Expression(o)))
 }
 
 fn _parse_expr(input: &str) -> IResult<&str, Expr> {
@@ -616,7 +597,8 @@ fn parse_break(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_return(input: &str) -> IResult<&str, Expr> {
-    tuple((wrap("return"), opt(_parse_expr)))(input).map(|(i, (_, o))| (i, Expr::Return(o.unwrap_or(Expr::Nil).into())))
+    tuple((wrap("return"), opt(_parse_expr)))(input)
+        .map(|(i, (_, o))| (i, Expr::Return(o.unwrap_or(Expr::Nil).into())))
 }
 
 // fn parse_ref(input: &str) -> IResult<&str, Expr> {
@@ -628,12 +610,7 @@ fn parse_deref(input: &str) -> IResult<&str, Expr> {
 }
 
 fn _parse_identifier(input: &str) -> IResult<&str, String> {
-    let (o, parsed) = many1(
-        alt((
-            alpha1,
-            tag("_")
-        ))
-    )(input)?;
+    let (o, parsed) = many1(alt((alpha1, tag("_"))))(input)?;
     Ok((o, parsed.join("")))
 }
 

@@ -7,11 +7,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::parser::{Expr, Token, Statement};
+use crate::parser::{Expr, Statement, Token};
 use crate::runtime::object::{ObjectRef, TraitDef};
 use crate::runtime::scope::Scope;
 
-use self::object::{BuiltinFunc, Object, ToObject, StructProps};
+use self::object::{BuiltinFunc, Object, StructProps, ToObject};
 use self::operations::{BinOps, UnaryOps};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -114,30 +114,28 @@ fn eval_self(scope: &mut Scope) -> EResult<ObjectRef> {
 }
 
 fn eval_struct(scope: &mut Scope, name: String, props: Vec<Expr>) -> EResult<ObjectRef> {
-    let rules = scope.get_struct_def(&name).ok_or(RuntimeError(format!("Struct {} does not exist", name)))?;
+    let rules = scope
+        .get_struct_def(&name)
+        .ok_or(RuntimeError(format!("Struct {} does not exist", name)))?;
     let props = props
-    .into_iter()
-    .map(|e| {
-        if let Expr::Assign { target, value } = e {
-            if let Expr::Term(Token::Identifier(name)) = *target {
-                return Ok((name, evaluate(scope, *value)?));
+        .into_iter()
+        .map(|e| {
+            if let Expr::Assign { target, value } = e {
+                if let Expr::Term(Token::Identifier(name)) = *target {
+                    return Ok((name, evaluate(scope, *value)?));
+                }
+                rt_err!("Expected term inside collection but found: {:?}", target)?
+            } else {
+                rt_err!("Expected assign inside collection, found: {:?}", e)?
             }
-            rt_err!("Expected term inside collection but found: {:?}", target)?
-        } else {
-            rt_err!("Expected assign inside collection, found: {:?}", e)?
-        }
-    })
-    .collect::<EResult<HashMap<String, ObjectRef>>>()?;
+        })
+        .collect::<EResult<HashMap<String, ObjectRef>>>()?;
     for prop in &rules {
         if !props.contains_key(prop) {
             rt_err!("Missing field {} for struct {}", prop, name)?
         }
     }
-    Ok(Object::Struct {
-        name,
-        rules,
-        props,
-    }.into())
+    Ok(Object::Struct { name, rules, props }.into())
 }
 
 fn eval_def_struct(scope: &mut Scope, name: String, props: StructProps) -> EResult<()> {
@@ -152,7 +150,10 @@ fn eval_impl_for(scope: &mut Scope, name: Token, target: Token) -> EResult<()> {
                 .trait_defs
                 .get(&name)
                 .cloned()
-                .ok_or(RuntimeError(format!("impl {}: trait {} does not exist", target, name)))?;
+                .ok_or(RuntimeError(format!(
+                    "impl {}: trait {} does not exist",
+                    target, name
+                )))?;
             let mut methods = HashMap::new();
             for f in def.methods {
                 if let Expr::Func {
@@ -553,16 +554,13 @@ fn eval_call_func(
                 Bubble::Continue => rt_err!("Cannot call continue outside loop")?,
                 _ => {} // eval & break get ignored
             },
-            Expr::While { pin, body } => match eval_while_with(
-                &mut inner,
-                *pin,
-                body,
-                &mut vec![Interrupts::Return],
-            )? {
-                Bubble::Return(v) => return Ok(v),
-                Bubble::Continue => rt_err!("Cannot call continue outside loop")?,
-                _ => {} // eval & break get ignored
-            },
+            Expr::While { pin, body } => {
+                match eval_while_with(&mut inner, *pin, body, &mut vec![Interrupts::Return])? {
+                    Bubble::Return(v) => return Ok(v),
+                    Bubble::Continue => rt_err!("Cannot call continue outside loop")?,
+                    _ => {} // eval & break get ignored
+                }
+            }
             Expr::For {
                 pin,
                 iterable,

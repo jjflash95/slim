@@ -1,7 +1,6 @@
 mod tests {
-    use std::cell::RefCell;
+
     use std::collections::HashMap;
-    use std::rc::Rc;
 
     use crate::parser::{parse, ParseResult};
     use crate::runtime::object::ToObject;
@@ -16,7 +15,9 @@ mod tests {
             match parse(input) {
                 Ok((i, ast)) => {
                     r = match ast {
-                        ParseResult::Expression(ast) => runtime::evaluate(&mut ctx, ast).unwrap().object(),
+                        ParseResult::Expression(ast) => {
+                            runtime::evaluate(&mut ctx, ast).unwrap().object()
+                        }
                         ParseResult::Statement(ast) => {
                             runtime::evaluate_stmt(&mut ctx, ast);
                             Object::Nil
