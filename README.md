@@ -2,7 +2,7 @@
 
 An interpreter built and inspired in pure rust.
 
-Working [examples](https://github.com/jjflash95/slim-examples)...
+Working [examples](https://github.com/jjflash95/slim-examples)
 
 ### Build & Install
 
