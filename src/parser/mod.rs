@@ -341,7 +341,7 @@ fn parse_while(input: &str) -> IResult<&str, Expr> {
 
 fn parse_func(input: &str) -> IResult<&str, Expr> {
     tuple((
-        wrap("func"),
+        wrap("fn"),
         opt(parse_identifier),
         wrap("("),
         parse_args,
