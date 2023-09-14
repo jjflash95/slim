@@ -8,7 +8,7 @@ use super::object::ObjectRef;
 use super::object::Ord;
 
 pub trait BinOps {
-    fn binary(self, op: Token, other: Self) -> EResult<Object>;
+    fn binary(self, op: &Token, other: Self) -> EResult<Object>;
     fn add(self, other: Self) -> EResult<Object>;
     fn sub(self, other: Self) -> EResult<Object>;
     fn mult(self, other: Self) -> EResult<Object>;
@@ -26,13 +26,13 @@ pub trait BinOps {
 }
 
 pub trait UnaryOps {
-    fn unary(self, token: Token) -> EResult<Object>;
+    fn unary(self, token: &Token) -> EResult<Object>;
     fn negative(self) -> EResult<Object>;
     fn not(self) -> EResult<Object>;
 }
 
 impl UnaryOps for Object {
-    fn unary(self, op: Token) -> EResult<Object> {
+    fn unary(self, op: &Token) -> EResult<Object> {
         match op {
             Token::Negative => self.negative(),
             Token::Not => self.not(),
@@ -60,7 +60,7 @@ impl UnaryOps for Object {
 }
 
 impl BinOps for Object {
-    fn binary(self, op: Token, other: Self) -> EResult<Object> {
+    fn binary(self, op: &Token, other: Self) -> EResult<Object> {
         match op {
             Token::Add => self.add(other),
             Token::Sub => self.sub(other),

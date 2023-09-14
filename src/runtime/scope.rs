@@ -35,8 +35,12 @@ impl Scope {
         None
     }
 
-    pub fn add_struct(&mut self, name: String, props: StructProps) {
-        self.struct_defs.insert(name, props);
+    pub fn add_trait_def(&mut self, name: &str, def: TraitDef) {
+        self.trait_defs.insert(name.to_string(), def);
+    }
+
+    pub fn add_struct(&mut self, name: &str, props: StructProps) {
+        self.struct_defs.insert(name.to_string(), props);
     }
 
     pub fn get_struct_def(&mut self, name: &str) -> Option<StructProps> {

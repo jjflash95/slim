@@ -26,12 +26,12 @@ pub fn interactive() -> Result<(), i32> {
                 Ok((_, ast)) => {
                     match ast {
                         ParseResult::Statement(stm) => {
-                            if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, stm) {
+                            if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, &stm) {
                                 handle_runtime_err("".to_string(), " ", e)
                             }
                         }
                         ParseResult::Expression(e) => {
-                            if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, e) {
+                            if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, &e) {
                                 handle_runtime_err("".to_string(), " ", e)
                             }
                         }
@@ -64,13 +64,13 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
                 input = i;
                 match ast {
                     ParseResult::Statement(stm) => {
-                        if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, stm) {
+                        if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, &stm) {
                             handle_runtime_err("".to_string(), " ", e);
                             return Err(1)
                         }
                     }
                     ParseResult::Expression(e) => {
-                        if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, e) {
+                        if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, &e) {
                             handle_runtime_err("".to_string(), " ", e);
                             return Err(1)
                         }

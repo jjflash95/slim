@@ -54,7 +54,7 @@ pub enum Bubble {
 #[cfg(test)]
 mod tests;
 
-pub fn evaluate_stmt(scope: &mut Scope, stm: Statement) -> EResult<()> {
+pub fn evaluate_stmt(scope: &mut Scope, stm: &Statement) -> EResult<()> {
     match stm {
         Statement::DefStruct { name, props } => eval_def_struct(scope, name, props),
         Statement::ImplFor { name, target } => eval_impl_for(scope, name, target),
@@ -63,15 +63,15 @@ pub fn evaluate_stmt(scope: &mut Scope, stm: Statement) -> EResult<()> {
     }
 }
 
-pub fn evaluate(scope: &mut Scope, expr: Expr) -> EResult<ObjectRef> {
+pub fn evaluate(scope: &mut Scope, expr: &Expr) -> EResult<ObjectRef> {
     match expr {
         Expr::Nil => nil!(),
         Expr::Struct { name, props } => eval_struct(scope, name, props),
-        Expr::Pipe { parent, child } => eval_pipe(scope, *parent, *child),
-        Expr::Call { target, args } => eval_call(scope, *target, args),
-        Expr::Func { name, params, body } => eval_func(scope, name, params, body),
+        Expr::Pipe { parent, child } => eval_pipe(scope, parent, child),
+        Expr::Call { target, args } => eval_call(scope, target, args),
+        Expr::Func { name, params, body } => eval_func(scope, name.as_deref(), params, body),
         Expr::Loop { body } => {
-            match eval_while_with(scope, Expr::Term(Token::True), body, &mut vec![])? {
+            match eval_while_with(scope, &Expr::Term(Token::True), body, &mut vec![])? {
                 Bubble::Eval(v) | Bubble::Break(v) => Ok(v),
                 bubble => rt_err!("Unexpected {:?}", bubble),
             }
@@ -80,7 +80,7 @@ pub fn evaluate(scope: &mut Scope, expr: Expr) -> EResult<ObjectRef> {
             pin,
             iterable,
             body,
-        } => match eval_for_with(scope, *pin, *iterable, body, &mut vec![])? {
+        } => match eval_for_with(scope, pin, iterable, body, &mut vec![])? {
             Bubble::Break(v) | Bubble::Eval(v) => Ok(v),
             bubble => rt_err!("Unexpected {:?}", bubble),
         },
@@ -88,21 +88,21 @@ pub fn evaluate(scope: &mut Scope, expr: Expr) -> EResult<ObjectRef> {
             Bubble::Eval(v) => Ok(v),
             bubble => rt_err!("Cannot call {:?} outside a loop/function", bubble),
         },
-        Expr::While { pin, body } => match eval_while_with(scope, *pin, body, &mut vec![])? {
+        Expr::While { pin, body } => match eval_while_with(scope, pin, body, &mut vec![])? {
             Bubble::Eval(v) | Bubble::Break(v) => Ok(v),
             bubble => rt_err!("Unexpected {:?}", bubble),
         },
         Expr::Scope(body) => eval_scope(scope, body),
-        Expr::Binary { op, left, right } => eval_binary(scope, op, *left, *right),
-        Expr::Unary { op, value } => eval_unary(scope, op, *value),
-        Expr::Deref(ptr) => Ok(evaluate(scope, *ptr)?.object().into()),
+        Expr::Binary { op, left, right } => eval_binary(scope, op, left, right),
+        Expr::Unary { op, value } => eval_unary(scope, op, value),
+        Expr::Deref(ptr) => Ok(evaluate(scope, ptr)?.object().into()),
         Expr::Collection(fields) => eval_collection(scope, fields),
-        Expr::Access { target, field } => eval_access(scope, *target, *field),
+        Expr::Access { target, field } => eval_access(scope, target, field),
         Expr::Sequence(items) => eval_sequence(scope, items),
         Expr::Term(Token::Identifier(i)) => eval_identifier(scope, i),
         Expr::Term(Token::_Self) => eval_self(scope),
-        Expr::Term(token) => Ok(TryInto::try_into(token)?),
-        Expr::Assign { target, value } => eval_assign(scope, *target, *value),
+        Expr::Term(token) => Ok(TryInto::try_into(token.clone())?),
+        Expr::Assign { target, value } => eval_assign(scope, target, value),
         _ => todo!(),
     }
 }
@@ -113,7 +113,7 @@ fn eval_self(scope: &mut Scope) -> EResult<ObjectRef> {
         .ok_or(RuntimeError("No self in scope".into()))
 }
 
-fn eval_struct(scope: &mut Scope, name: String, props: Vec<Expr>) -> EResult<ObjectRef> {
+fn eval_struct(scope: &mut Scope, name: &str, props: &[Expr]) -> EResult<ObjectRef> {
     let rules = scope
         .get_struct_def(&name)
         .ok_or(RuntimeError(format!("Struct {} does not exist", name)))?;
@@ -121,8 +121,8 @@ fn eval_struct(scope: &mut Scope, name: String, props: Vec<Expr>) -> EResult<Obj
         .into_iter()
         .map(|e| {
             if let Expr::Assign { target, value } = e {
-                if let Expr::Term(Token::Identifier(name)) = *target {
-                    return Ok((name, evaluate(scope, *value)?));
+                if let Expr::Term(Token::Identifier(ref name)) = **target {
+                    return Ok((name.to_owned(), evaluate(scope, &*value)?));
                 }
                 rt_err!("Expected term inside collection but found: {:?}", target)?
             } else {
@@ -135,20 +135,20 @@ fn eval_struct(scope: &mut Scope, name: String, props: Vec<Expr>) -> EResult<Obj
             rt_err!("Missing field {} for struct {}", prop, name)?
         }
     }
-    Ok(Object::Struct { name, rules, props }.into())
+    Ok(Object::Struct { name: name.to_string(), rules, props }.into())
 }
 
-fn eval_def_struct(scope: &mut Scope, name: String, props: StructProps) -> EResult<()> {
-    scope.add_struct(name, props);
+fn eval_def_struct(scope: &mut Scope, name: &str, props: &[String]) -> EResult<()> {
+    scope.add_struct(name, props.into());
     Ok(())
 }
 
-fn eval_impl_for(scope: &mut Scope, name: Token, target: Token) -> EResult<()> {
+fn eval_impl_for(scope: &mut Scope, name: &Token, target: &Token) -> EResult<()> {
     match (name, target) {
         (Token::Identifier(name), Token::Identifier(target)) => {
             let def = scope
                 .trait_defs
-                .get(&name)
+                .get(name)
                 .cloned()
                 .ok_or(RuntimeError(format!(
                     "impl {}: trait {} does not exist",
@@ -160,22 +160,22 @@ fn eval_impl_for(scope: &mut Scope, name: Token, target: Token) -> EResult<()> {
                     name, params, body, ..
                 } = f
                 {
-                    let name = name.ok_or(RuntimeError(
+                    let name = name.clone().ok_or(RuntimeError(
                         "Cannot implement anonymous trait functions".into(),
                     ))?;
-                    methods.insert(name, _eval_func(scope, None, params, body)?.1);
+                    methods.insert(name, _eval_func(scope, None, &params, &body)?.1);
                 } else {
                     rt_err!("Found non-function in trait impl")?
                 }
             }
-            scope.add_trait(target.into(), methods);
+            scope.add_trait(target.clone().into(), methods);
             Ok(())
         }
         (n, t) => rt_err!("Cannot impl {:?} for {:?}", n, t),
     }
 }
 
-fn eval_impl(scope: &mut Scope, target: Token, _methods: Vec<Expr>) -> EResult<()> {
+fn eval_impl(scope: &mut Scope, target: &Token, _methods: &[Expr]) -> EResult<()> {
     if let Token::Identifier(target) = target {
         let mut methods = HashMap::new();
         for f in _methods {
@@ -183,7 +183,7 @@ fn eval_impl(scope: &mut Scope, target: Token, _methods: Vec<Expr>) -> EResult<(
                 name, params, body, ..
             } = f
             {
-                let name = name.ok_or(RuntimeError(
+                let name = name.clone().ok_or(RuntimeError(
                     "Cannot implement anonymous trait functions".into(),
                 ))?;
                 methods.insert(name, _eval_func(scope, None, params, body)?.1);
@@ -191,59 +191,60 @@ fn eval_impl(scope: &mut Scope, target: Token, _methods: Vec<Expr>) -> EResult<(
                 rt_err!("Found non-function in trait impl")?
             }
         }
-        scope.add_trait(target.into(), methods);
+        scope.add_trait(target.clone().into(), methods);
         return Ok(());
     }
     rt_err!("Cannot eval direct impl")
 }
 
-fn eval_declare_trait(scope: &mut Scope, name: Token, methods: Vec<Expr>) -> EResult<()> {
+fn eval_declare_trait(scope: &mut Scope, name: &Token, methods: &[Expr]) -> EResult<()> {
     if let Token::Identifier(name) = name {
-        for m in &methods {
+        for m in methods {
             if !matches!(m, Expr::Func { .. }) {
                 rt_err!("Trait methods must be functions")?
             }
         }
-        scope.trait_defs.insert(name, TraitDef { methods });
+        scope.add_trait_def(name, TraitDef { methods: methods.into() });
         return Ok(());
     }
     rt_err!("Cannot eval trait")
 }
 
-fn eval_pipe(scope: &mut Scope, parent: Expr, child: Expr) -> EResult<ObjectRef> {
+fn eval_pipe(scope: &mut Scope, parent: &Expr, child: &Expr) -> EResult<ObjectRef> {
     let mut arguments = vec![child];
     let f = match parent {
         Expr::Term(..) => parent,
         Expr::Call { target, args } => {
             arguments.extend(args.into_iter());
-            *target
+            target
         }
         e => rt_err!("Cannot use: {:?} as callable", e)?,
     };
-    eval_call(scope, f, arguments)
+    let arguments = arguments.into_iter().map(|a| a.clone()).collect::<Vec<Expr>>();
+    eval_call(scope, &f, &arguments)
 }
 
 fn eval_while_with(
     scope: &mut Scope,
-    pin: Expr,
-    body: Vec<Expr>,
+    pin: &Expr,
+    body: &[Expr],
     interrupts: &mut Vec<Interrupts>,
 ) -> EResult<Bubble> {
     let mut last: ObjectRef = nil!()?;
 
-    while evaluate(scope, pin.clone())?.borrow().is_truthy() {
-        for expr in body.clone() {
+    while evaluate(scope, pin)?.borrow().is_truthy() {
+        for expr in body {
             match expr {
                 Expr::Return(e) => {
                     if interrupts.contains(&Interrupts::Return) {
-                        return Ok(Bubble::Return(evaluate(scope, *e)?));
+                        return Ok(Bubble::Return(evaluate(scope, &*e)?));
                     }
                     rt_err!("Cannot return from outside a function")?
                 }
-                Expr::Break(v) => return Ok(Bubble::Break(evaluate(scope, *v)?)),
+                Expr::Break(v) => return Ok(Bubble::Break(evaluate(scope, &*v)?)),
                 Expr::Continue => break,
                 Expr::Loop { body } => {
-                    match eval_while_with(scope, Expr::Term(Token::True), body, interrupts)? {
+                    match eval_while_with(scope, &Expr::Term(Token::True), body, interrupts)? {
                         Bubble::Return(v) => {
                             if interrupts.contains(&Interrupts::Return) {
                                 return Ok(Bubble::Return(v));
@@ -259,7 +260,7 @@ fn eval_while_with(
                     iterable,
                     body,
                 } => {
-                    match eval_for_with(scope, *pin, *iterable, body, interrupts)? {
+                    match eval_for_with(scope, pin, iterable, body, interrupts)? {
                         Bubble::Return(v) => {
                             if interrupts.contains(&Interrupts::Return) {
                                 return Ok(Bubble::Return(v));
@@ -271,7 +272,7 @@ fn eval_while_with(
                     };
                 }
                 Expr::While { pin, body } => {
-                    match eval_while_with(scope, *pin, body, interrupts)? {
+                    match eval_while_with(scope, pin, body, interrupts)? {
                         Bubble::Return(v) => {
                             if interrupts.contains(&Interrupts::Return) {
                                 return Ok(Bubble::Return(v));
@@ -306,9 +307,9 @@ fn eval_while_with(
 
 fn eval_for_with(
     scope: &mut Scope,
-    pin: Expr,
-    iterable: Expr,
-    body: Vec<Expr>,
+    pin: &Expr,
+    iterable: &Expr,
+    body: &[Expr],
     interrupts: &mut Vec<Interrupts>,
 ) -> EResult<Bubble> {
     let mut last = nil!()?;
@@ -323,14 +324,14 @@ fn eval_for_with(
             match expr {
                 Expr::Return(e) => {
                     if interrupts.contains(&Interrupts::Return) {
-                        return Ok(Bubble::Return(evaluate(scope, *e)?));
+                        return Ok(Bubble::Return(evaluate(scope, e)?));
                     }
                     rt_err!("Cannot return from outside a function")?
                 }
-                Expr::Break(v) => return Ok(Bubble::Break(evaluate(scope, *v)?)),
+                Expr::Break(v) => return Ok(Bubble::Break(evaluate(scope, v)?)),
                 Expr::Continue => break,
                 Expr::Loop { body } => {
-                    match eval_while_with(scope, Expr::Term(Token::True), body, interrupts)? {
+                    match eval_while_with(scope, &Expr::Term(Token::True), body, interrupts)? {
                         Bubble::Return(v) => {
                             if interrupts.contains(&Interrupts::Return) {
                                 return Ok(Bubble::Return(v));
@@ -346,7 +347,7 @@ fn eval_for_with(
                     iterable,
                     body,
                 } => {
-                    match eval_for_with(scope, *pin, *iterable, body, interrupts)? {
+                    match eval_for_with(scope, pin, iterable, body, interrupts)? {
                         Bubble::Return(v) => {
                             if interrupts.contains(&Interrupts::Return) {
                                 return Ok(Bubble::Return(v));
@@ -358,7 +359,7 @@ fn eval_for_with(
                     };
                 }
                 Expr::While { pin, body } => {
-                    match eval_while_with(scope, *pin, body, interrupts)? {
+                    match eval_while_with(scope, pin, body, interrupts)? {
                         Bubble::Return(v) => {
                             if interrupts.contains(&Interrupts::Return) {
                                 return Ok(Bubble::Return(v));
@@ -392,19 +393,19 @@ fn eval_for_with(
 
 fn eval_interruptable_expr(
     scope: &mut Scope,
-    expr: Expr,
+    expr: &Expr,
     interrupts: &mut Vec<Interrupts>,
 ) -> EResult<Bubble> {
     match expr {
         Expr::Return(e) => {
             if interrupts.contains(&Interrupts::Return) {
-                return Ok(Bubble::Return(evaluate(scope, *e)?));
+                return Ok(Bubble::Return(evaluate(scope, e)?));
             }
             rt_err!("Cannot return from outside a function")?
         }
         Expr::Break(v) => {
             if interrupts.contains(&Interrupts::Break) {
-                return Ok(Bubble::Break(evaluate(scope, *v)?));
+                return Ok(Bubble::Break(evaluate(scope, v)?));
             }
             rt_err!("Cannot call break from outside a loop")?
         }
@@ -420,7 +421,7 @@ fn eval_interruptable_expr(
 
 fn eval_branches_with(
     scope: &mut Scope,
-    branches: Vec<(Expr, Vec<Expr>)>,
+    branches: &[(Expr, Vec<Expr>)],
     interrupts: &mut Vec<Interrupts>,
 ) -> EResult<Bubble> {
     for (cond, body) in branches.into_iter() {
@@ -438,7 +439,7 @@ fn eval_branches_with(
                         }
                     }
                     Expr::Loop { body } => {
-                        match eval_while_with(scope, Expr::Term(Token::True), body, interrupts)? {
+                        match eval_while_with(scope, &Expr::Term(Token::True), body, interrupts)? {
                             Bubble::Eval(v) => last = v,
                             bubble => return Ok(bubble),
                         };
@@ -447,7 +448,7 @@ fn eval_branches_with(
                         pin,
                         iterable,
                         body,
-                    } => match eval_for_with(scope, *pin, *iterable, body, interrupts)? {
+                    } => match eval_for_with(scope, pin, iterable, body, interrupts)? {
                         Bubble::Eval(v) => last = v,
                         bubble => return Ok(bubble),
                     },
@@ -462,7 +463,7 @@ fn eval_branches_with(
     Ok(Bubble::Eval(nil!()?))
 }
 
-fn eval_binary(scope: &mut Scope, op: Token, left: Expr, right: Expr) -> EResult<ObjectRef> {
+fn eval_binary(scope: &mut Scope, op: &Token, left: &Expr, right: &Expr) -> EResult<ObjectRef> {
     let left = evaluate(scope, left)?;
     let right = evaluate(scope, right)?;
     let left = left.object();
@@ -470,17 +471,17 @@ fn eval_binary(scope: &mut Scope, op: Token, left: Expr, right: Expr) -> EResult
     Ok(left.binary(op, right)?.into())
 }
 
-fn eval_scope(scope: &mut Scope, body: Vec<Expr>) -> EResult<ObjectRef> {
+fn eval_scope(scope: &mut Scope, body: &[Expr]) -> EResult<ObjectRef> {
     let mut inner = Scope::default();
     inner.parent = Some(scope.get_ref());
 
     let mut last = nil!()?;
     for expr in body {
         match expr {
-            Expr::Return(e) => return evaluate(&mut inner, *e),
+            Expr::Return(e) => return evaluate(&mut inner, e),
             Expr::Loop { body } => match eval_while_with(
                 scope,
-                Expr::Term(Token::True),
+                &Expr::Term(Token::True),
                 body,
                 &mut vec![Interrupts::Return],
             )? {
@@ -495,8 +496,8 @@ fn eval_scope(scope: &mut Scope, body: Vec<Expr>) -> EResult<ObjectRef> {
                 body,
             } => match eval_for_with(
                 &mut inner,
-                *pin,
-                *iterable,
+                pin,
+                iterable,
                 body,
                 &mut vec![Interrupts::Return],
             )? {
@@ -525,9 +526,9 @@ fn eval_scope(scope: &mut Scope, body: Vec<Expr>) -> EResult<ObjectRef> {
 fn eval_call_func(
     scope: &mut Scope,
     _: Option<String>,
-    params: Vec<String>,
+    params: &[String],
     locals: Option<HashMap<String, ObjectRef>>,
-    body: Vec<Expr>,
+    body: &[Expr],
     args: Vec<ObjectRef>,
 ) -> EResult<ObjectRef> {
     let mut inner = Scope::default();
@@ -538,15 +539,15 @@ fn eval_call_func(
     }
 
     for (param, arg) in params.into_iter().zip(args) {
-        inner.store.insert(param, arg);
+        inner.store.insert(param.clone(), arg);
     }
 
     for expr in body {
         match expr {
-            Expr::Return(e) => return evaluate(&mut inner, *e),
+            Expr::Return(e) => return evaluate(&mut inner, e),
             Expr::Loop { body } => match eval_while_with(
                 &mut inner,
-                Expr::Term(Token::True),
+                &Expr::Term(Token::True),
                 body,
                 &mut vec![Interrupts::Return],
             )? {
@@ -555,7 +556,7 @@ fn eval_call_func(
                 _ => {} // eval & break get ignored
             },
             Expr::While { pin, body } => {
-                match eval_while_with(&mut inner, *pin, body, &mut vec![Interrupts::Return])? {
+                match eval_while_with(&mut inner, pin, body, &mut vec![Interrupts::Return])? {
                     Bubble::Return(v) => return Ok(v),
                     Bubble::Continue => rt_err!("Cannot call continue outside loop")?,
                     _ => {} // eval & break get ignored
@@ -567,8 +568,8 @@ fn eval_call_func(
                 body,
             } => match eval_for_with(
                 &mut inner,
-                *pin,
-                *iterable,
+                pin,
+                iterable,
                 body,
                 &mut vec![Interrupts::Return],
             )? {
@@ -593,7 +594,7 @@ fn eval_call_func(
     nil!()
 }
 
-fn eval_call(scope: &mut Scope, f: Expr, args: Vec<Expr>) -> EResult<ObjectRef> {
+fn eval_call(scope: &mut Scope, f: &Expr, args: &[Expr]) -> EResult<ObjectRef> {
     let args = args
         .into_iter()
         .map(|a| evaluate(scope, a))
@@ -604,7 +605,7 @@ fn eval_call(scope: &mut Scope, f: Expr, args: Vec<Expr>) -> EResult<ObjectRef> 
             params,
             locals,
             body,
-        } => eval_call_func(scope, name, params, locals, body, args),
+        } => eval_call_func(scope, name, &params, locals, &body, args),
         Object::Builtin(BuiltinFunc(b)) => b(scope, args),
         v => rt_err!("Cannot call: {:?} as a function", v),
     }
@@ -612,35 +613,35 @@ fn eval_call(scope: &mut Scope, f: Expr, args: Vec<Expr>) -> EResult<ObjectRef> 
 
 fn _eval_func(
     scope: &mut Scope,
-    name: Option<String>,
-    params: Vec<Expr>,
-    body: Vec<Expr>,
+    name: Option<&str>,
+    params: &[Expr],
+    body: &[Expr],
 ) -> EResult<(Option<String>, ObjectRef)> {
     let params = params.into_iter().map(|a| {
         if let Expr::Term(Token::Identifier(arg)) = a {
-            return Ok(arg);
+            return Ok(arg.clone());
         }
         rt_err!("Expected arg but found: {:?}", a)
     });
 
     Ok((
-        name.clone(),
+        name.map(str::to_string),
         Rc::new(RefCell::new(Object::Func {
-            name,
+            name: name.map(str::to_string),
             params: params.collect::<EResult<Vec<String>>>()?,
             locals: scope.locals(),
-            body,
+            body: body.to_vec(),
         })),
     ))
 }
 
 fn eval_func(
     scope: &mut Scope,
-    name: Option<String>,
-    params: Vec<Expr>,
-    body: Vec<Expr>,
+    name: Option<&str>,
+    params: &[Expr],
+    body: &[Expr],
 ) -> EResult<ObjectRef> {
-    let (name, func) = _eval_func(scope, name, params, body)?;
+    let (name, func) = _eval_func(scope, name.as_deref(), params, body)?;
 
     if let Some(name) = name {
         scope.set(&name, Rc::clone(&func));
@@ -649,20 +650,20 @@ fn eval_func(
     Ok(func)
 }
 
-fn eval_unary(scope: &mut Scope, op: Token, value: Expr) -> EResult<ObjectRef> {
+fn eval_unary(scope: &mut Scope, op: &Token, value: &Expr) -> EResult<ObjectRef> {
     let object = evaluate(scope, value)?.object();
     Ok(object.unary(op)?.into())
 }
 
-fn eval_identifier(scope: &mut Scope, i: String) -> EResult<ObjectRef> {
-    if let Some(object) = scope.get(&i) {
+fn eval_identifier(scope: &mut Scope, i: &str) -> EResult<ObjectRef> {
+    if let Some(object) = scope.get(i) {
         Ok(object)
     } else {
         rt_err!("No variable named: {}", i)
     }
 }
 
-fn eval_assign(scope: &mut Scope, target: Expr, value: Expr) -> EResult<ObjectRef> {
+fn eval_assign(scope: &mut Scope, target: &Expr, value: &Expr) -> EResult<ObjectRef> {
     let oref = evaluate(scope, value)?;
     match target {
         Expr::Term(Token::Identifier(name)) => {
@@ -670,11 +671,11 @@ fn eval_assign(scope: &mut Scope, target: Expr, value: Expr) -> EResult<ObjectRe
             nil!()
         }
         Expr::Access { target, field } => {
-            let src = eval_access(scope, *target, *field)?;
+            let src = eval_access(scope, &target, &field)?;
             src.replace(oref.object());
             nil!()
         }
-        Expr::Deref(inner) => match *inner {
+        Expr::Deref(ref inner) => match &**inner {
             Expr::Term(Token::Identifier(name)) => {
                 let prev = scope
                     .get(&name)
@@ -689,30 +690,30 @@ fn eval_assign(scope: &mut Scope, target: Expr, value: Expr) -> EResult<ObjectRe
                 prev.replace(oref.object());
                 nil!()
             }
-            Expr::Access { target, field } => eval_access(scope, *target, *field),
+            Expr::Access { target, field } => eval_access(scope, &target, &field),
             inner => rt_err!("Cannot deref expression: {:?}", inner),
         },
         _ => rt_err!("Cannot assign to expression: {:?}", target),
     }
 }
 
-fn eval_sequence(scope: &mut Scope, items: Vec<Expr>) -> EResult<ObjectRef> {
+fn eval_sequence(scope: &mut Scope, items: &[Expr]) -> EResult<ObjectRef> {
     Ok(Object::Sequence(
         items
-            .into_iter()
+            .iter()
             .map(|i| evaluate(scope, i))
             .collect::<Result<Vec<ObjectRef>, RuntimeError>>()?,
     )
     .into())
 }
 
-fn eval_collection(scope: &mut Scope, items: Vec<Expr>) -> EResult<ObjectRef> {
+fn eval_collection(scope: &mut Scope, items: &[Expr]) -> EResult<ObjectRef> {
     let items = items
         .into_iter()
         .map(|e| {
             if let Expr::Assign { target, value } = e {
-                if let Expr::Term(Token::Identifier(name)) = *target {
-                    return Ok((name, evaluate(scope, *value)?));
+                if let Expr::Term(Token::Identifier(ref name)) = **target {
+                    return Ok((name.to_owned(), evaluate(scope, value)?));
                 }
                 rt_err!("Expected term inside collection but found: {:?}", target)?
             } else {
@@ -723,7 +724,7 @@ fn eval_collection(scope: &mut Scope, items: Vec<Expr>) -> EResult<ObjectRef> {
     Ok(Object::Collection(items).into())
 }
 
-fn eval_access(scope: &mut Scope, target: Expr, field: Expr) -> EResult<ObjectRef> {
+fn eval_access(scope: &mut Scope, target: &Expr, field: &Expr) -> EResult<ObjectRef> {
     let target = evaluate(scope, target)?;
     let field = evaluate(scope, field)?;
     let src = &mut *target.borrow_mut();

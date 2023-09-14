@@ -16,10 +16,10 @@ mod tests {
                 Ok((i, ast)) => {
                     r = match ast {
                         ParseResult::Expression(ast) => {
-                            runtime::evaluate(&mut ctx, ast).unwrap().object()
+                            runtime::evaluate(&mut ctx, &ast).unwrap().object()
                         }
                         ParseResult::Statement(ast) => {
-                            runtime::evaluate_stmt(&mut ctx, ast);
+                            runtime::evaluate_stmt(&mut ctx, &ast).unwrap();
                             Object::Nil
                         }
                     };
