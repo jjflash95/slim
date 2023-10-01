@@ -2,7 +2,6 @@ use crate::parser::TokenValue;
 
 use crate::runtime::Object;
 
-
 use super::object::ObjectRef;
 use super::object::Ord;
 
@@ -48,10 +47,7 @@ impl UnaryOps for Object {
         match self {
             Object::Int(n) => Ok(Object::Int(-n)),
             Object::Float(f) => Ok(Object::Float(-f)),
-            _ => Err(format!(
-                "Cannot get negative value of {:?}",
-                self
-            )),
+            _ => Err(format!("Cannot get negative value of {:?}", self)),
         }
     }
 
@@ -199,14 +195,9 @@ impl BinOps for Object {
             (&Object::Bool(l), other) => Ok(if !l { self } else { other }),
             (Object::Str(l), other) => Ok(if l.is_empty() { self } else { other }),
             (&Object::Nil, ..) => Ok(self),
-            (Object::Collection(fields), other) => {
-                Ok(if fields.is_empty() { self } else { other })
-            }
+            (Object::Collection(fields), other) => Ok(if fields.is_empty() { self } else { other }),
             (&Object::Func { .. }, other) => Ok(other),
-            (l, r) => Err(format!(
-                "Cannot compare && {:?} to {:?}",
-                l, r
-            )),
+            (l, r) => Err(format!("Cannot compare && {:?} to {:?}", l, r)),
         }
     }
 
@@ -217,14 +208,9 @@ impl BinOps for Object {
             (&Object::Bool(l), other) => Ok(if !l { other } else { self }),
             (Object::Str(l), other) => Ok(if l.is_empty() { other } else { self }),
             (&Object::Nil, other) => Ok(other),
-            (Object::Collection(fields), other) => {
-                Ok(if fields.is_empty() { other } else { self })
-            }
+            (Object::Collection(fields), other) => Ok(if fields.is_empty() { other } else { self }),
             (&Object::Func { .. }, ..) => Ok(self),
-            (l, r) => Err(format!(
-                "Cannot compare || {:?} to {:?}",
-                l, r
-            )),
+            (l, r) => Err(format!("Cannot compare || {:?} to {:?}", l, r)),
         }
     }
 }
@@ -246,10 +232,7 @@ impl Helpers for Object {
                     .chain(TryInto::<Vec<ObjectRef>>::try_into(other)?)
                     .collect(),
             )),
-            _ => Err(format!(
-                "Cannot merge {:?} to {:?}",
-                self, other
-            )),
+            _ => Err(format!("Cannot merge {:?} to {:?}", self, other)),
         }
     }
 

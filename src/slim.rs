@@ -1,22 +1,19 @@
-
-
-use crate::prelude;
 use crate::parser;
+use crate::parser::lexer;
 use crate::parser::ParseError;
 use crate::parser::TokenStream;
-use crate::parser::lexer;
+use crate::prelude;
 
-use crate::parser::Block;
 use crate::parser::lexer::Span;
 use crate::parser::lexer::Token;
 use crate::parser::parse_ast;
+use crate::parser::Block;
 use crate::runtime;
 use crate::runtime::builtins;
 use crate::runtime::scope::Scope;
 use crate::runtime::RuntimeError;
 use std::fs;
 use std::io::{self, Write};
-
 
 pub fn interactive() -> Result<(), i32> {
     let mut scope = get_scope();
@@ -39,15 +36,17 @@ pub fn interactive() -> Result<(), i32> {
                 Ok(ast) => {
                     match ast {
                         Block::Statement(stm) => {
-                            if let Err(RuntimeError(span, e)) = dbg!(runtime::evaluate_stmt(&mut scope, &stm)) {
+                            if let Err(RuntimeError(span, e)) =
+                                dbg!(runtime::evaluate_stmt(&mut scope, &stm))
+                            {
                                 eprintln!("{}", get_runtime_err_msg(span, e, &input));
-                                return Err(1)
+                                return Err(1);
                             }
                         }
                         Block::Expression(e) => {
                             if let Err(RuntimeError(span, e)) = runtime::evaluate(&mut scope, &e) {
                                 eprintln!("{}", get_runtime_err_msg(span, e, &input));
-                                return Err(1)
+                                return Err(1);
                             }
                         }
                     };
@@ -55,7 +54,7 @@ pub fn interactive() -> Result<(), i32> {
                 Err(ParseError::Interrupt(e, t)) => {
                     eprintln!("{}", get_parse_err_msg(t, e, &input));
                     return Err(2);
-                },
+                }
                 Err(ParseError::Continue) => {
                     panic!("bug in parser")
                 }
@@ -75,7 +74,7 @@ pub fn run_program(args: &[String]) -> Result<(), i32> {
         Err(ParseError::Interrupt(e, t)) => {
             eprintln!("{}", get_parse_err_msg(t, e, &program));
             return Err(2);
-        },
+        }
         Err(ParseError::Continue) => {
             panic!("bug in parser")
         }
@@ -97,7 +96,7 @@ pub fn execute_tree(scope: &mut Scope, ast: &[Block]) -> Result<(), RuntimeError
                 let _ = runtime::evaluate(scope, e)?;
             }
         };
-    };
+    }
 
     Ok(())
 }
@@ -115,7 +114,11 @@ fn get_scope() -> Scope {
 pub fn get_runtime_err_msg(span: Span, e: String, program: &str) -> String {
     let (line, col) = (span.row, span.col);
     let fail_line = program.lines().collect::<Vec<&str>>()[line];
-    let indicator = fail_line[..col].chars().map(|c| if c == '\t' { '\t' } else { ' ' }).collect::<String>() + "^";
+    let indicator = fail_line[..col]
+        .chars()
+        .map(|c| if c == '\t' { '\t' } else { ' ' })
+        .collect::<String>()
+        + "^";
     format!("[RuntimeError]: {}\n{}\n{}", e, fail_line, indicator)
 }
 
@@ -123,6 +126,13 @@ pub fn get_parse_err_msg(token: Token, e: &str, p: &str) -> String {
     let (line, col) = (token.span.row, token.span.col);
     let t = token.value;
     let fail_line = p.lines().collect::<Vec<&str>>()[line];
-    let indicator = fail_line[..col].chars().map(|c| if c == '\t' { '\t' } else { ' ' }).collect::<String>() + "^";
-    format!("[ParseError]: {}\n{}\n{}\n\tfound: {:?}", e, fail_line, indicator, t)
+    let indicator = fail_line[..col]
+        .chars()
+        .map(|c| if c == '\t' { '\t' } else { ' ' })
+        .collect::<String>()
+        + "^";
+    format!(
+        "[ParseError]: {}\n{}\n{}\n\tfound: {:?}",
+        e, fail_line, indicator, t
+    )
 }

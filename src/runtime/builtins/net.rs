@@ -15,8 +15,16 @@ use std::{
 };
 
 pub fn listen(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
-    let host: String = next_arg(&mut args, "host").map_err(|s| RuntimeError(span.to_owned(), s))?.object().try_into().map_err(|s| RuntimeError(span.to_owned(), s))?;
-    let port: i128 = next_arg(&mut args, "port").map_err(|s| RuntimeError(span.to_owned(), s))?.object().try_into().map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let host: String = next_arg(&mut args, "host")
+        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .object()
+        .try_into()
+        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let port: i128 = next_arg(&mut args, "port")
+        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .object()
+        .try_into()
+        .map_err(|s| RuntimeError(span.to_owned(), s))?;
     let listener = TcpListener::bind((host.as_str(), port as u16)).unwrap();
 
     if let Ok((stream, _)) = listener.accept() {
@@ -31,14 +39,23 @@ pub fn listen(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<O
         };
 
         let write = move |_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>| {
-            let t: String = args.remove(0).object().try_into().map_err(|s| RuntimeError(span.to_owned(), s))?;
+            let t: String = args
+                .remove(0)
+                .object()
+                .try_into()
+                .map_err(|s| RuntimeError(span.to_owned(), s))?;
             let mut buf = t.as_bytes();
             while !buf.is_empty() {
                 let res = (*writer).borrow_mut().write(buf);
                 match res {
                     Ok(0) => break,
                     Ok(n) => buf = &buf[n..],
-                    Err(_) => return Err(RuntimeError(span.to_owned(), "Failed socket.write".to_owned())),
+                    Err(_) => {
+                        return Err(RuntimeError(
+                            span.to_owned(),
+                            "Failed socket.write".to_owned(),
+                        ))
+                    }
                 };
             }
             nil!()

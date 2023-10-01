@@ -4,11 +4,10 @@ use std::hash::Hash;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::parser::lexer::TokenValue;
-use crate::parser::{Expr, Token, Block, Span};
+use crate::parser::{Block, Expr, Span, Token};
 
 use crate::runtime::scope::Scope;
 use crate::runtime::EResult;
-
 
 pub type BuiltinClosure = Rc<Box<dyn Fn(&mut Scope, &Span, Vec<ObjectRef>) -> EResult<ObjectRef>>>;
 
@@ -180,10 +179,7 @@ impl Object {
         if let Object::Str(name) = field.borrow().clone() {
             let traits = scope
                 .get_trait_impl(self._type())
-                .ok_or(format!(
-                    "type {:?} has no traits",
-                    self._type()
-                ))?;
+                .ok_or(format!("type {:?} has no traits", self._type()))?;
             traits
                 .get(&name)
                 .cloned()
@@ -323,7 +319,6 @@ impl Object {
                 let _ = write!(s, "{}}}", "  ".repeat(indent as usize));
                 s
             }
-            _ => "".into(),
         }
     }
 }

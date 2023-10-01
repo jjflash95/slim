@@ -39,10 +39,10 @@ pub fn split(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
             )
             .into(),
         },
-        _ => Err(RuntimeError(span.to_owned(), format!(
-            "Expected string but got <{:?}> instead",
-            arg
-        )))?,
+        _ => Err(RuntimeError(
+            span.to_owned(),
+            format!("Expected string but got <{:?}> instead", arg),
+        ))?,
     })
 }
 
@@ -52,9 +52,10 @@ fn pop(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     }
     let mut arg = args[0].borrow_mut();
     if let Object::Sequence(s) = &mut *arg {
-        return s
-            .pop()
-            .ok_or(RuntimeError(span.to_owned(), "Cannot pop from empty sequence".into()));
+        return s.pop().ok_or(RuntimeError(
+            span.to_owned(),
+            "Cannot pop from empty sequence".into(),
+        ));
     }
     rt_err!(span, "pop takes a sequence")
 }
@@ -97,9 +98,19 @@ pub fn slice(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
         return rt_err!(span, "Slice needs 3 arguments");
     }
 
-    let iterable = next_arg(&mut args, "sequence").map_err(|s| RuntimeError(span.to_owned(), s))?.object();
-    let start: i128 = next_arg(&mut args, "start").map_err(|s| RuntimeError(span.to_owned(), s))?.object().try_into().map_err(|s| RuntimeError(span.to_owned(), s))?;
-    let end: i128 = next_arg(&mut args, "end").map_err(|s| RuntimeError(span.to_owned(), s))?.object().try_into().map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let iterable = next_arg(&mut args, "sequence")
+        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .object();
+    let start: i128 = next_arg(&mut args, "start")
+        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .object()
+        .try_into()
+        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let end: i128 = next_arg(&mut args, "end")
+        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .object()
+        .try_into()
+        .map_err(|s| RuntimeError(span.to_owned(), s))?;
     match iterable {
         Object::Sequence(seq) => {
             Ok(Object::Sequence(seq[start as usize..end as usize].into()).into())
@@ -110,8 +121,16 @@ pub fn slice(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
 }
 
 fn rand(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
-    let lower: i128 = next_arg(&mut args, "lower").map_err(|s| RuntimeError(span.to_owned(), s))?.object().try_into().map_err(|s| RuntimeError(span.to_owned(), s))?;
-    let upper: i128 = next_arg(&mut args, "upper").map_err(|s| RuntimeError(span.to_owned(), s))?.object().try_into().map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let lower: i128 = next_arg(&mut args, "lower")
+        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .object()
+        .try_into()
+        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let upper: i128 = next_arg(&mut args, "upper")
+        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .object()
+        .try_into()
+        .map_err(|s| RuntimeError(span.to_owned(), s))?;
     let mut seed = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -147,10 +166,10 @@ fn uppercase(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
     let arg = next_arg(&mut args, "string").map_err(|s| RuntimeError(span.to_owned(), s))?;
     Ok(match arg.object() {
         Object::Str(s) => Object::Str(s.to_uppercase()).into(),
-        _ => Err(RuntimeError(span.to_owned(), format!(
-            "Expected string but got `{:?}` instead",
-            arg
-        )))?,
+        _ => Err(RuntimeError(
+            span.to_owned(),
+            format!("Expected string but got `{:?}` instead", arg),
+        ))?,
     })
 }
 
@@ -158,10 +177,10 @@ fn lowercase(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
     let arg = next_arg(&mut args, "string").map_err(|s| RuntimeError(span.to_owned(), s))?;
     Ok(match arg.object() {
         Object::Str(s) => Object::Str(s.to_lowercase()).into(),
-        _ => Err(RuntimeError(span.to_owned(), format!(
-            "Expected string but got `{:?}` instead",
-            arg
-        )))?,
+        _ => Err(RuntimeError(
+            span.to_owned(),
+            format!("Expected string but got `{:?}` instead", arg),
+        ))?,
     })
 }
 

@@ -1,12 +1,11 @@
 use core::panic;
-use std::{str::Chars, iter::Peekable};
-
+use std::{iter::Peekable, str::Chars};
 
 #[derive(Clone, Debug, Default)]
 pub struct Span {
     pub col: usize,
     pub row: usize,
-    pub filename: String
+    pub filename: String,
 }
 
 impl PartialEq for Span {
@@ -35,7 +34,10 @@ pub struct CharArray<'a> {
 
 impl<'a> CharArray<'a> {
     fn new(text: &'a str, span: Span) -> Self {
-        CharArray { chars: text.chars().peekable(), span }
+        CharArray {
+            chars: text.chars().peekable(),
+            span,
+        }
     }
 
     fn peek(&mut self) -> Option<&char> {
@@ -51,8 +53,8 @@ impl<'a> CharArray<'a> {
                     self.span.col = 0;
                 }
                 Some(c)
-            },
-            None => None
+            }
+            None => None,
         }
     }
 
@@ -171,13 +173,13 @@ pub fn tokenize(text: &str, file: Option<String>) -> Vec<Token> {
     let span = Span {
         col: 0,
         row: 0,
-        filename
+        filename,
     };
 
     let mut chars = CharArray::new(text, span);
     while let Some(token) = next_token(&mut chars) {
         tokens.push(token);
-    };
+    }
     tokens
 }
 
@@ -230,7 +232,7 @@ impl From<Token> for String {
         match token.value {
             TokenValue::Identifier(value) => value,
             TokenValue::Str(value) => value,
-            _ => panic!("XDSDSDSDD")
+            _ => panic!("XDSDSDSDD"),
         }
     }
 }
@@ -252,12 +254,11 @@ fn parse_str(chars: &mut CharArray, span: Span, ch: char) -> Option<Token> {
         } else {
             acc.push(c);
         };
-    };
+    }
 
-    Some(
-        Token {
-            value: TokenValue::Str(acc),
-            span
+    Some(Token {
+        value: TokenValue::Str(acc),
+        span,
     })
 }
 
@@ -270,11 +271,11 @@ fn parse_identifier(leading: char, chars: &mut CharArray, span: Span) -> Token {
         } else {
             break;
         }
-    };
+    }
 
     Token {
         value: acc.into(),
-        span
+        span,
     }
 }
 
@@ -288,18 +289,18 @@ fn parse_num(leading: char, chars: &mut CharArray, span: Span) -> Token {
         } else {
             break;
         }
-    };
+    }
 
     if let Ok(int) = acc.parse::<i128>() {
         return Token {
             value: TokenValue::Int(int),
-            span
-        }
+            span,
+        };
     } else if let Ok(float) = acc.parse::<f64>() {
         return Token {
             value: TokenValue::Float(float),
-            span
-        }
+            span,
+        };
     };
     panic!("XDparsenum")
 }
@@ -307,211 +308,160 @@ fn parse_num(leading: char, chars: &mut CharArray, span: Span) -> Token {
 fn next_token(chars: &mut CharArray) -> Option<Token> {
     let span = chars.current_span();
     let Some(char) = chars.next() else {
-        return None
+        return None;
     };
 
     match char {
         ' ' | '\t' | '\n' => next_token(chars),
-        '(' => Some(
-            Token {
-                value: TokenValue::LParen,
-                span
-            }
-        ),
-        ')' => Some(
-            Token {
-                value: TokenValue::RParen,
-                span
-            }
-        ),
-        '{' => Some(
-            Token {
-                value: TokenValue::LBrace,
-                span
-            },
-        ),
-        '}' => Some(
-            Token {
-                value: TokenValue::RBrace,
-                span
-            },
-        ),
-        '[' => Some(
-            Token {
-                value: TokenValue::LBracket,
-                span
-            }
-        ),
-        ']' => Some(
-            Token {
-                value: TokenValue::RBracket,
-                span
-            }
-        ),
-        '.' => Some(
-            Token {
-                value: TokenValue::Dot,
-                span
-            }
-        ),
-        ',' => Some(
-            Token {
-                value: TokenValue::Comma,
-                span
-            }
-        ),
+        '(' => Some(Token {
+            value: TokenValue::LParen,
+            span,
+        }),
+        ')' => Some(Token {
+            value: TokenValue::RParen,
+            span,
+        }),
+        '{' => Some(Token {
+            value: TokenValue::LBrace,
+            span,
+        }),
+        '}' => Some(Token {
+            value: TokenValue::RBrace,
+            span,
+        }),
+        '[' => Some(Token {
+            value: TokenValue::LBracket,
+            span,
+        }),
+        ']' => Some(Token {
+            value: TokenValue::RBracket,
+            span,
+        }),
+        '.' => Some(Token {
+            value: TokenValue::Dot,
+            span,
+        }),
+        ',' => Some(Token {
+            value: TokenValue::Comma,
+            span,
+        }),
         '=' => {
             let next = chars.peek();
             match next {
                 Some('=') => {
                     chars.next();
-                    Some(
-                        Token {
-                            value: TokenValue::Eq,
-                            span
-                        }
-                    )
+                    Some(Token {
+                        value: TokenValue::Eq,
+                        span,
+                    })
                 }
-                _ => Some(
-                    Token {
-                        value: TokenValue::Assign,
-                        span
-                    }
-                )
+                _ => Some(Token {
+                    value: TokenValue::Assign,
+                    span,
+                }),
             }
-        },
+        }
         '!' => {
             let next = chars.peek();
             match next {
                 Some('=') => {
                     chars.next();
-                    Some(
-                        Token {
-                            value: TokenValue::Ne,
-                            span
-                        }
-                    )
+                    Some(Token {
+                        value: TokenValue::Ne,
+                        span,
+                    })
                 }
-                _ => Some(
-                    Token {
-                        value: TokenValue::Not,
-                        span
-                    }
-                )
+                _ => Some(Token {
+                    value: TokenValue::Not,
+                    span,
+                }),
             }
-        },
+        }
         '>' => {
             let next = chars.peek();
             match next {
                 Some('=') => {
                     chars.next();
-                    Some(
-                        Token {
-                            value: TokenValue::Gte,
-                            span
-                        }
-                    )
+                    Some(Token {
+                        value: TokenValue::Gte,
+                        span,
+                    })
                 }
-                _ => Some(
-                    Token {
-                        value: TokenValue::Gt,
-                        span
-                    }
-                )
+                _ => Some(Token {
+                    value: TokenValue::Gt,
+                    span,
+                }),
             }
-        },
+        }
         '<' => {
             let next = chars.peek();
             match next {
                 Some('=') => {
                     chars.next();
-                    Some(
-                        Token {
-                            value: TokenValue::Lte,
-                            span
-                        }
-                    )
+                    Some(Token {
+                        value: TokenValue::Lte,
+                        span,
+                    })
                 }
                 Some('<') => {
                     chars.next();
-                    Some(
-                        Token {
-                            value: TokenValue::Mutate,
-                            span
-                        }
-                    )
+                    Some(Token {
+                        value: TokenValue::Mutate,
+                        span,
+                    })
                 }
-                _ => Some(
-                    Token {
-                        value: TokenValue::Lt,
-                        span
-                    }
-                )
+                _ => Some(Token {
+                    value: TokenValue::Lt,
+                    span,
+                }),
             }
-        },
+        }
         '&' => {
             let next = chars.peek();
             if let Some('&') = next {
                 chars.next();
-                Some(
-                    Token {
-                        value: TokenValue::And,
-                        span
-                    }
-                )
+                Some(Token {
+                    value: TokenValue::And,
+                    span,
+                })
             } else {
-                Some(
-                    Token {
-                        value: TokenValue::Pipe,
-                        span
-                    }
-                )
+                Some(Token {
+                    value: TokenValue::Pipe,
+                    span,
+                })
             }
-        },
+        }
         '|' => {
             if let Some('|') = chars.peek() {
                 chars.next();
-                Some(
-                    Token {
-                        value: TokenValue::Or,
-                        span
-                    }
-                )
+                Some(Token {
+                    value: TokenValue::Or,
+                    span,
+                })
             } else {
-                Some(
-                    Token {
-                        value: TokenValue::Pipe,
-                        span
-                    }
-                )
+                Some(Token {
+                    value: TokenValue::Pipe,
+                    span,
+                })
             }
         }
-        '/' => {
-            match chars.peek() {
-                Some('/') => {
-                    while let Some(c) = chars.next() {
-                        if c == '\n' {
-                            break;
-                        }
-                    };
-                    next_token(chars)
-                }
-                _ => Some(
-                    Token {
-                        value: TokenValue::Slash,
-                        span
+        '/' => match chars.peek() {
+            Some('/') => {
+                while let Some(c) = chars.next() {
+                    if c == '\n' {
+                        break;
                     }
-                )
-            }
-        }
-        '*' | '+' | '-' | '%' | ':' => Some(
-            char.try_into().map(|value| {
-                Token {
-                    value,
-                    span
                 }
+                next_token(chars)
             }
-        ).unwrap()),
+            _ => Some(Token {
+                value: TokenValue::Slash,
+                span,
+            }),
+        },
+        '*' | '+' | '-' | '%' | ':' => {
+            Some(char.try_into().map(|value| Token { value, span }).unwrap())
+        }
         '"' => parse_str(chars, span, '"'),
         '\'' => parse_str(chars, span, '\''),
         c => {
@@ -520,7 +470,7 @@ fn next_token(chars: &mut CharArray) -> Option<Token> {
             } else if is_numeric(char) {
                 Some(parse_num(c, chars, span))
             } else {
-                dbg!(c, c,c);
+                dbg!(c, c, c);
                 dbg!(chars.clone().chars.collect::<String>());
                 panic!("XcharD")
             }
