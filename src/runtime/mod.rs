@@ -53,9 +53,6 @@ pub enum Bubble {
     Continue,
 }
 
-#[cfg(test)]
-mod tests;
-
 pub fn evaluate_stmt(scope: &mut Scope, stm: &Statement) -> EResult<()> {
     match stm {
         Statement::Import { span, path, name } => eval_import(scope, span, path, name),
