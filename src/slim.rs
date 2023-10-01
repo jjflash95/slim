@@ -1,5 +1,11 @@
 use crate::parser;
-use crate::parser::ParseResult;
+use crate::parser::ParseError;
+use crate::parser::TokenStream;
+use crate::parser::lexer;
+use crate::parser::PResult;
+use crate::parser::Block;
+use crate::parser::lexer::Span;
+use crate::parser::lexer::Token;
 use crate::runtime;
 use crate::runtime::builtins;
 use crate::runtime::scope::Scope;
@@ -22,23 +28,31 @@ pub fn interactive() -> Result<(), i32> {
                 break;
             }
 
-            match parser::parse(&input) {
-                Ok((_, ast)) => {
+            let mut stream = TokenStream::from_tokens(lexer::tokenize(&input, None));
+
+            match parser::parse(&mut stream) {
+                Ok(ast) => {
                     match ast {
-                        ParseResult::Statement(stm) => {
-                            if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, &stm) {
-                                handle_runtime_err("".to_string(), " ", e)
+                        Block::Statement(stm) => {
+                            if let Err(RuntimeError(span, e)) = dbg!(runtime::evaluate_stmt(&mut scope, &stm)) {
+                                handle_runtime_err(span, e, &input);
+                                return Err(1)
                             }
                         }
-                        ParseResult::Expression(e) => {
-                            if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, &e) {
-                                handle_runtime_err("".to_string(), " ", e)
+                        Block::Expression(e) => {
+                            if let Err(RuntimeError(span, e)) = runtime::evaluate(&mut scope, &e) {
+                                handle_runtime_err(span, e, &input);
+                                return Err(1)
                             }
                         }
                     };
                 }
-                Err(e) => {
-                    eprintln!("[ParseError] {:?}", e);
+                Err(ParseError::Interrupt(e, t)) => {
+                    handle_parse_err(t, e, &input);
+                    return Err(2);
+                },
+                Err(ParseError::Continue) => {
+                    panic!("bug in parser")
                 }
             };
         }
@@ -50,40 +64,37 @@ pub fn interactive() -> Result<(), i32> {
 pub fn run_program(args: &[String]) -> Result<(), i32> {
     let path = &args[0];
     let program = fs::read_to_string(path).unwrap();
-    let p = program.clone();
-    let mut input = program.as_str();
+    let mut stream = TokenStream::from_tokens(lexer::tokenize(&program, Some(path.to_owned())));
     let mut scope = get_scope();
 
     loop {
-        if [""].contains(&input.trim()) {
+        if stream.is_empty() {
             break;
         };
 
-        match parser::parse(input) {
-            Ok((i, ast)) => {
-                input = i;
+        match parser::parse(&mut stream) {
+            Ok(ast) => {
                 match ast {
-                    ParseResult::Statement(stm) => {
-                        if let Err(RuntimeError(e)) = runtime::evaluate_stmt(&mut scope, &stm) {
-                            handle_runtime_err("".to_string(), " ", e);
+                    Block::Statement(stm) => {
+                        if let Err(RuntimeError(span, e)) = runtime::evaluate_stmt(&mut scope, &stm) {
+                            handle_runtime_err(span, e, &program);
                             return Err(1)
                         }
                     }
-                    ParseResult::Expression(e) => {
-                        if let Err(RuntimeError(e)) = runtime::evaluate(&mut scope, &e) {
-                            handle_runtime_err("".to_string(), " ", e);
+                    Block::Expression(e) => {
+                        if let Err(RuntimeError(span, e)) = runtime::evaluate(&mut scope, &e) {
+                            handle_runtime_err(span, e, &program);
                             return Err(1)
                         }
                     }
                 };
             }
-            Err(nom::Err::Error(e)) => {
-                handle_parse_err(p, e);
-                return Err(1);
-            }
-            Err(e) => {
-                eprintln!("[ParseError]: {:?}", e);
+            Err(ParseError::Interrupt(e, t)) => {
+                handle_parse_err(t, e, &program);
                 return Err(2);
+            },
+            Err(ParseError::Continue) => {
+                panic!("bug in parser")
             }
         };
     }
@@ -117,30 +128,17 @@ fn find_error_on_string(main_text: &str, substring: &str) -> Option<(usize, usiz
     None
 }
 
-fn handle_runtime_err(p: String, remaining: &str, e: String) {
-    if let Some((line, col)) = find_error_on_string(&p, remaining) {
-        let fail_line = p.lines().collect::<Vec<&str>>()[line - 1];
-        let mut indicator: String = " ".repeat(col - 1);
-
-        indicator.push('^');
-        eprintln!(
-            "{}",
-            &format!("line: {}\n\t{}\n\t{}", line, fail_line, indicator)
-        )
-    };
-    eprintln!("[RuntimeError]: {}", e);
+fn handle_runtime_err(span: Span, e: String, program: &str) {
+    let (line, col) = (span.row, span.col);
+    let fail_line = program.lines().collect::<Vec<&str>>()[line];
+    let indicator = fail_line[..col].chars().map(|c| if c == '\t' { '\t' } else { ' ' }).collect::<String>() + "^";
+    eprintln!("[RuntimeError]: {}\n{}\n{}", e, fail_line, indicator);
 }
 
-fn handle_parse_err(p: String, e: nom::error::Error<&str>) {
-    if let Some((line, col)) = find_error_on_string(&p, e.input) {
-        let fail_line = p.lines().collect::<Vec<&str>>()[line - 1];
-        let mut indicator: String = " ".repeat(col - 1);
-
-        indicator.push('^');
-        eprintln!(
-            "{}",
-            &format!("line: {}\n\t{}\n\t{}", line, fail_line, indicator)
-        )
-    };
-    eprintln!("[ParseError]: Invalid syntax");
+fn handle_parse_err(token: Token, e: &str, p: &str) {
+    let (line, col) = (token.span.row, token.span.col);
+    let t = token.value;
+    let fail_line = p.lines().collect::<Vec<&str>>()[line];
+    let indicator = fail_line[..col].chars().map(|c| if c == '\t' { '\t' } else { ' ' }).collect::<String>() + "^";
+    eprintln!("[ParseError]: {}\n{}\n{}\n\tfound: {:?}", e, fail_line, indicator, t);
 }

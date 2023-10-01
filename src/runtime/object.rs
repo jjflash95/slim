@@ -3,13 +3,14 @@ use std::fmt::Write;
 use std::hash::Hash;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::parser::{Expr, Token};
+use crate::parser::lexer::TokenValue;
+use crate::parser::{Expr, Token, Block, Span};
 use crate::rt_err;
 use crate::runtime::scope::Scope;
 use crate::runtime::EResult;
 use crate::runtime::RuntimeError;
 
-pub type BuiltinClosure = Rc<Box<dyn Fn(&mut Scope, Vec<ObjectRef>) -> EResult<ObjectRef>>>;
+pub type BuiltinClosure = Rc<Box<dyn Fn(&mut Scope, &Span, Vec<ObjectRef>) -> EResult<ObjectRef>>>;
 
 #[derive(Clone)]
 pub struct BuiltinFunc(pub BuiltinClosure);
@@ -54,7 +55,7 @@ pub enum Object {
         name: Option<String>,
         params: Vec<String>,
         locals: Option<HashMap<String, ObjectRef>>,
-        body: Vec<Expr>,
+        body: Vec<Block>,
     },
     Struct {
         name: String,
@@ -175,31 +176,31 @@ impl Object {
         }
     }
 
-    pub fn get_trait(&mut self, scope: &mut Scope, field: ObjectRef) -> EResult<ObjectRef> {
+    pub fn get_trait(&mut self, scope: &mut Scope, field: ObjectRef) -> Result<ObjectRef, String> {
         if let Object::Str(name) = field.borrow().clone() {
             let traits = scope
                 .get_trait_impl(self._type())
-                .ok_or(RuntimeError(format!(
+                .ok_or(format!(
                     "type {:?} has no traits",
                     self._type()
-                )))?;
+                ))?;
             traits
                 .get(&name)
                 .cloned()
-                .ok_or(RuntimeError(format!("did not found trait for {:?}", field)))
+                .ok_or(format!("did not found trait for {:?}", field))
         } else {
-            rt_err!("type {:?} has no field {:?}", self._type(), field)
+            Err(format!("type {:?} has no field {:?}", self._type(), field))
         }
     }
 
-    pub fn into_vec(self) -> EResult<Vec<ObjectRef>> {
+    pub fn into_vec(self) -> Result<Vec<ObjectRef>, String> {
         match self {
             Object::Sequence(items) => Ok(items),
             Object::Str(s) => Ok(s
                 .chars()
                 .map(|c| Object::Str(c.to_string()).into())
                 .collect()),
-            _ => rt_err!("Cannot convert {:?} to vec", self),
+            _ => Err(format!("Cannot convert {:?} to vec", self)),
         }
     }
 
@@ -218,13 +219,13 @@ impl Object {
         }
     }
 
-    pub fn access(&mut self, field: Object) -> EResult<ObjectRef> {
+    pub fn access(&mut self, field: Object) -> Result<ObjectRef, String> {
         match self {
             Object::Sequence(items) => match field {
                 Object::Int(index) => {
                     let item = items
                         .get(index as usize)
-                        .ok_or_else(|| RuntimeError(format!("No index: {}", index)))?;
+                        .ok_or_else(|| format!("No index: {}", index))?;
                     return Ok(Rc::clone(item));
                 }
                 Object::Nil => {
@@ -246,12 +247,12 @@ impl Object {
             Object::Struct { name, rules, props } => match field {
                 Object::Str(key) => {
                     if !rules.contains(&key) {
-                        rt_err!("Struct {} has no field {}", name, key)?
+                        Err(format!("Struct {} has no field {}", name, key))?
                     };
 
                     let item = props
                         .get(&key)
-                        .ok_or_else(|| RuntimeError(format!("No field named: {}", key)))?;
+                        .ok_or_else(|| format!("No field named: {}", key))?;
                     return Ok(Rc::clone(item));
                 }
                 _ => {}
@@ -259,7 +260,7 @@ impl Object {
             _ => {}
         };
 
-        rt_err!("cannot access : {:?} with {:?}", self, field)
+        Err(format!("cannot access : {:?} with {:?}", self, field))
     }
 
     fn format(&self, indent: u8) -> String {
@@ -344,67 +345,67 @@ impl ToObject for Rc<RefCell<Object>> {
 }
 
 impl TryInto<Vec<ObjectRef>> for Object {
-    type Error = RuntimeError;
+    type Error = String;
 
-    fn try_into(self) -> EResult<Vec<ObjectRef>> {
+    fn try_into(self) -> Result<Vec<ObjectRef>, String> {
         match self {
             Object::Sequence(items) => Ok(items),
-            _ => rt_err!("Cannot convert {:?} to sequence", self),
+            _ => Err(format!("Cannot convert {:?} to sequence", self)),
         }
     }
 }
 
 impl TryInto<HashMap<String, ObjectRef>> for Object {
-    type Error = RuntimeError;
+    type Error = String;
 
     fn try_into(self) -> Result<HashMap<String, ObjectRef>, Self::Error> {
         match self {
             Object::Collection(fields) => Ok(fields),
-            _ => rt_err!("Cannot convert {:?} to collection", self),
+            _ => Err(format!("Cannot convert {:?} to collection", self)),
         }
     }
 }
 
 impl TryInto<i128> for Object {
-    type Error = RuntimeError;
+    type Error = String;
 
     fn try_into(self) -> Result<i128, Self::Error> {
         match self {
             Object::Int(n) => Ok(n),
-            _ => rt_err!("Cannot convert {:?} to integer", self),
+            _ => Err(format!("Cannot convert {:?} to integer", self)),
         }
     }
 }
 
 impl TryInto<f64> for Object {
-    type Error = RuntimeError;
+    type Error = String;
 
     fn try_into(self) -> Result<f64, Self::Error> {
         match self {
             Object::Float(n) => Ok(n),
-            _ => rt_err!("Cannot convert {:?} to float", self),
+            _ => Err(format!("Cannot convert {:?} to float", self)),
         }
     }
 }
 
 impl TryInto<usize> for Object {
-    type Error = RuntimeError;
+    type Error = String;
 
     fn try_into(self) -> Result<usize, Self::Error> {
         match self {
             Object::Int(n) => Ok(n as usize),
-            _ => rt_err!("Cannot convert {:?} to integer", self),
+            _ => Err(format!("Cannot convert {:?} to integer", self)),
         }
     }
 }
 
 impl TryInto<String> for Object {
-    type Error = RuntimeError;
+    type Error = String;
 
     fn try_into(self) -> Result<String, Self::Error> {
         match self {
             Object::Str(s) => Ok(s),
-            _ => rt_err!("Cannot convert {:?} to string", self),
+            _ => Err(format!("Cannot convert {:?} to string", self)),
         }
     }
 }
@@ -431,37 +432,37 @@ impl Into<bool> for Object {
 }
 
 impl TryFrom<Token> for Object {
-    type Error = RuntimeError;
-    fn try_from(token: Token) -> EResult<Object> {
-        match token {
-            Token::Int(n) => Ok(Object::Int(n)),
-            Token::Float(n) => Ok(Object::Float(n)),
-            Token::StringLiteral(s) => Ok(Object::Str(s)),
-            Token::True => Ok(Object::Bool(true)),
-            Token::False => Ok(Object::Bool(false)),
-            Token::Nil => Ok(Object::Nil),
-            _ => Err(RuntimeError(format!(
+    type Error = String;
+    fn try_from(token: Token) -> Result<Object, String> {
+        match token.value {
+            TokenValue::Int(n) => Ok(Object::Int(n)),
+            TokenValue::Float(n) => Ok(Object::Float(n)),
+            TokenValue::Str(s) => Ok(Object::Str(s)),
+            TokenValue::True => Ok(Object::Bool(true)),
+            TokenValue::False => Ok(Object::Bool(false)),
+            TokenValue::Nil => Ok(Object::Nil),
+            _ => Err(format!(
                 "Cannot directly convert token `{:?}` to value",
                 token
-            ))),
+            )),
         }
     }
 }
 
 impl TryFrom<Token> for ObjectRef {
-    type Error = RuntimeError;
-    fn try_from(token: Token) -> EResult<ObjectRef> {
-        match token {
-            Token::Int(n) => Ok(Object::Int(n).into()),
-            Token::Float(n) => Ok(Object::Float(n).into()),
-            Token::StringLiteral(s) => Ok(Object::Str(s).into()),
-            Token::True => Ok(Object::Bool(true).into()),
-            Token::False => Ok(Object::Bool(false).into()),
-            Token::Nil => Ok(Object::Nil.into()),
-            _ => Err(RuntimeError(format!(
+    type Error = String;
+    fn try_from(token: Token) -> Result<ObjectRef, String> {
+        match token.value {
+            TokenValue::Int(n) => Ok(Object::Int(n).into()),
+            TokenValue::Float(n) => Ok(Object::Float(n).into()),
+            TokenValue::Str(s) => Ok(Object::Str(s).into()),
+            TokenValue::True => Ok(Object::Bool(true).into()),
+            TokenValue::False => Ok(Object::Bool(false).into()),
+            TokenValue::Nil => Ok(Object::Nil.into()),
+            _ => Err(format!(
                 "Cannot directly convert token `{:?}` to value",
                 token
-            ))),
+            )),
         }
     }
 }
