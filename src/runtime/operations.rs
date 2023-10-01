@@ -1,7 +1,7 @@
 use crate::parser::TokenValue;
-use crate::rt_err;
+
 use crate::runtime::Object;
-use crate::runtime::RuntimeError;
+
 
 use super::object::ObjectRef;
 use super::object::Ord;
@@ -197,9 +197,9 @@ impl BinOps for Object {
             (&Object::Int(l), other) => Ok(if l == 0 { self } else { other }),
             (&Object::Float(l), other) => Ok(if l == 0.0 { self } else { other }),
             (&Object::Bool(l), other) => Ok(if !l { self } else { other }),
-            (&Object::Str(ref l), other) => Ok(if l.is_empty() { self } else { other }),
+            (Object::Str(l), other) => Ok(if l.is_empty() { self } else { other }),
             (&Object::Nil, ..) => Ok(self),
-            (&Object::Collection(ref fields), other) => {
+            (Object::Collection(fields), other) => {
                 Ok(if fields.is_empty() { self } else { other })
             }
             (&Object::Func { .. }, other) => Ok(other),
@@ -215,9 +215,9 @@ impl BinOps for Object {
             (&Object::Int(l), other) => Ok(if l == 0 { other } else { self }),
             (&Object::Float(l), other) => Ok(if l == 0.0 { other } else { self }),
             (&Object::Bool(l), other) => Ok(if !l { other } else { self }),
-            (&Object::Str(ref l), other) => Ok(if l.is_empty() { other } else { self }),
+            (Object::Str(l), other) => Ok(if l.is_empty() { other } else { self }),
             (&Object::Nil, other) => Ok(other),
-            (&Object::Collection(ref fields), other) => {
+            (Object::Collection(fields), other) => {
                 Ok(if fields.is_empty() { other } else { self })
             }
             (&Object::Func { .. }, ..) => Ok(self),

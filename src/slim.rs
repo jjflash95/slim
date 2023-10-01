@@ -1,11 +1,11 @@
-use nom::Err;
+
 
 use crate::prelude;
 use crate::parser;
 use crate::parser::ParseError;
 use crate::parser::TokenStream;
 use crate::parser::lexer;
-use crate::parser::PResult;
+
 use crate::parser::Block;
 use crate::parser::lexer::Span;
 use crate::parser::lexer::Token;
@@ -16,7 +16,7 @@ use crate::runtime::scope::Scope;
 use crate::runtime::RuntimeError;
 use std::fs;
 use std::io::{self, Write};
-use std::vec;
+
 
 pub fn interactive() -> Result<(), i32> {
     let mut scope = get_scope();
@@ -91,10 +91,10 @@ pub fn execute_tree(scope: &mut Scope, ast: &[Block]) -> Result<(), RuntimeError
     for block in ast {
         match block {
             Block::Statement(stm) => {
-                let _ = runtime::evaluate_stmt(scope, &stm)?;
+                runtime::evaluate_stmt(scope, stm)?;
             }
             Block::Expression(e) => {
-                let _ = runtime::evaluate(scope, &e)?;
+                let _ = runtime::evaluate(scope, e)?;
             }
         };
     };
@@ -107,8 +107,8 @@ fn get_scope() -> Scope {
     for (name, f) in builtins::default() {
         scope.set(name, f)
     }
-    let ast = parse_ast(&prelude::PRELUDE).expect("Failed to parse prelude");
-    let _ = execute_tree(&mut scope, &ast).expect("Failed to execute prelude");
+    let ast = parse_ast(prelude::PRELUDE).expect("Failed to parse prelude");
+    execute_tree(&mut scope, &ast).expect("Failed to execute prelude");
     scope
 }
 

@@ -59,13 +59,13 @@ fn pop(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     rt_err!(span, "pop takes a sequence")
 }
 
-fn clear(_: &mut Scope, span: &Span, _: Vec<ObjectRef>) -> EResult<ObjectRef> {
+fn clear(_: &mut Scope, _span: &Span, _: Vec<ObjectRef>) -> EResult<ObjectRef> {
     print!("\x1B[2J\x1B[1;1H"); // ANSI escape code to clear the screen
     std::io::stdout().flush().unwrap();
     nil!()
 }
 
-fn dbg(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
+fn dbg(_: &mut Scope, _span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     for arg in args {
         // remove 1 from ref_count, since arg passed to dbg is a new Rc
         println!("Refs: {} -> {:?}", Rc::strong_count(&arg) - 1, arg);
@@ -73,7 +73,7 @@ fn dbg(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     Ok(Object::Nil.into())
 }
 
-fn print(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
+fn print(_: &mut Scope, _span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     for arg in args {
         print!("{}", arg.borrow().clone());
     }
@@ -81,7 +81,7 @@ fn print(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef>
     Ok(Object::Nil.into())
 }
 
-fn input(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
+fn input(_: &mut Scope, _span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     if !args.is_empty() {
         let prompt = args[0].borrow().clone();
         print!("{}", prompt);
@@ -135,7 +135,7 @@ fn len(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     }
 }
 
-fn concat(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
+fn concat(_: &mut Scope, _span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     let mut result = String::new();
     for arg in args {
         result.push_str(&arg.borrow().to_string());

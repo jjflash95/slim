@@ -5,10 +5,10 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::parser::lexer::TokenValue;
 use crate::parser::{Expr, Token, Block, Span};
-use crate::rt_err;
+
 use crate::runtime::scope::Scope;
 use crate::runtime::EResult;
-use crate::runtime::RuntimeError;
+
 
 pub type BuiltinClosure = Rc<Box<dyn Fn(&mut Scope, &Span, Vec<ObjectRef>) -> EResult<ObjectRef>>>;
 
@@ -143,9 +143,9 @@ impl fmt::Debug for BuiltinFunc {
     }
 }
 
-impl Into<Type> for String {
-    fn into(self) -> Type {
-        match self.as_str() {
+impl From<String> for Type {
+    fn from(val: String) -> Self {
+        match val.as_str() {
             "nil" => Type::Nil,
             "bool" => Type::Bool,
             "int" => Type::Int,
@@ -155,7 +155,7 @@ impl Into<Type> for String {
             "sequence" => Type::Sequence,
             "builtin" => Type::Builtin,
             "func" => Type::Func,
-            _ => Type::Struct(self),
+            _ => Type::Struct(val),
         }
     }
 }
@@ -410,15 +410,15 @@ impl TryInto<String> for Object {
     }
 }
 
-impl Into<ObjectRef> for Object {
-    fn into(self) -> ObjectRef {
-        Rc::new(RefCell::new(self))
+impl From<Object> for ObjectRef {
+    fn from(val: Object) -> Self {
+        Rc::new(RefCell::new(val))
     }
 }
 
-impl Into<bool> for Object {
-    fn into(self) -> bool {
-        match self {
+impl From<Object> for bool {
+    fn from(val: Object) -> Self {
+        match val {
             Object::Nil => false,
             Object::Bool(b) => b,
             Object::Int(n) => n != 0,

@@ -1,5 +1,5 @@
 use core::panic;
-use std::{str::Chars, iter::Peekable, default};
+use std::{str::Chars, iter::Peekable};
 
 
 #[derive(Clone, Debug, Default)]
@@ -10,13 +10,13 @@ pub struct Span {
 }
 
 impl PartialEq for Span {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
 
 impl PartialOrd for Span {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, _other: &Self) -> Option<std::cmp::Ordering> {
         Some(std::cmp::Ordering::Equal)
     }
 }
@@ -162,7 +162,7 @@ fn is_alpha(ch: char) -> bool {
 }
 
 fn is_numeric(ch: char) -> bool {
-    ('0'..='9').contains(&ch) || ch == '_'
+    ch.is_ascii_digit() || ch == '_'
 }
 
 pub fn tokenize(text: &str, file: Option<String>) -> Vec<Token> {

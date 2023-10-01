@@ -1,8 +1,8 @@
 
-use std::collections::HashMap;
+
 use std::{iter::Peekable, vec::IntoIter};
 
-use nom::Err;
+
 
 use crate::parser::lexer::Token;
 use crate::parser::lexer::TokenValue;
@@ -237,7 +237,7 @@ fn parse_from_import(tokens: &mut TokenStream) -> PResult<Statement> {
     let span = tokens.expect(|t| matches!(t, TokenValue::From)).map_err(|_| ParseError::Continue)?.span;
     let path = tokens.expect(|t| matches!(t, TokenValue::Str(_)))?.value.str();
     let mut names = Vec::new();
-    if let Ok(_) = tokens.expect(|t| matches!(t, TokenValue::LBrace)) {
+    if tokens.expect(|t| matches!(t, TokenValue::LBrace)).is_ok() {
         names = comma_separated(|tokens| {
             tokens.expect_identifier().map(|t| t.value.identifier())
         })(tokens);
@@ -340,7 +340,7 @@ fn parse_assignment(tokens: &mut TokenStream) -> PResult<Expr> {
         let right = parse_expression(tokens)?;
         left = match &bind.value {
             TokenValue::Assign | TokenValue::Semicolon => Expr::Assign { span, target: left.into(), value: right.into() },
-            TokenValue::Mutate => Expr::Assign { span: span, target: Expr::Deref(left.get_span().to_owned(), left.into()).into(), value: right.into() },
+            TokenValue::Mutate => Expr::Assign { span, target: Expr::Deref(left.get_span().to_owned(), left.into()).into(), value: right.into() },
             _ => unreachable!()
         }
     }
@@ -367,7 +367,7 @@ fn parse_if(tokens: &mut TokenStream) -> PResult<Expr> {
         (cond, body),
     ];
     while let Ok(t) = tokens.expect(|t| matches!(t, TokenValue::Else)) {
-        let condition = if let Ok(_) = tokens.expect(|t| matches!(t, TokenValue::If)) {
+        let condition = if tokens.expect(|t| matches!(t, TokenValue::If)).is_ok() {
             parse_expression(tokens)?
         } else {
             Expr::Term(t.span, TokenValue::True)
@@ -433,7 +433,7 @@ fn parse_args(tokens: &mut TokenStream) -> Vec<Expr> {
     let mut args = Vec::new();
     while let Ok(expr) = parse_expression(tokens) {
         args.push(expr);
-        if let Err(_) = tokens.expect(|t| matches!(t, TokenValue::Comma)) {
+        if tokens.expect(|t| matches!(t, TokenValue::Comma)).is_err() {
             break;
         }
     }
@@ -449,8 +449,7 @@ fn parse_grouped(tokens: &mut TokenStream) -> PResult<Expr> {
 }
 
 fn parse_term(tokens: &mut TokenStream) -> PResult<Expr> {
-    vec![
-        parse_grouped,
+    [parse_grouped,
         parse_struct_create,
         parse_continue,
         parse_func,
@@ -466,8 +465,7 @@ fn parse_term(tokens: &mut TokenStream) -> PResult<Expr> {
         parse_int,
         parse_sequence,
         parse_collection,
-        parse_bool,
-    ].run(tokens)
+        parse_bool].run(tokens)
 }
 
 fn parse_nil(tokens: &mut TokenStream) -> PResult<Expr> {
@@ -526,7 +524,7 @@ fn comma_separated<T>(mut f: impl FnMut(&mut TokenStream) -> PResult<T>) -> impl
         let mut items = Vec::new();
         while let Ok(item) = f(tokens) {
             items.push(item);
-            if let Err(_) = tokens.expect(|t| matches!(t, TokenValue::Comma)) {
+            if tokens.expect(|t| matches!(t, TokenValue::Comma)).is_err() {
                 break;
             }
         }
@@ -572,7 +570,7 @@ fn parse_props(tokens: &mut TokenStream) -> Vec<String> {
     let mut props = Vec::new();
     while let Ok(prop) = tokens.expect_identifier() {
         props.push(prop.into());
-        if let Err(_) = tokens.expect(|t| matches!(t, TokenValue::Comma)) {
+        if tokens.expect(|t| matches!(t, TokenValue::Comma)).is_err() {
             break;
         }
     }
@@ -591,7 +589,7 @@ fn parse_params(tokens: &mut TokenStream) -> Vec<Expr> {
     let mut args = Vec::new();
     while let Ok(token) = tokens.expect_identifier() {
         args.push(Expr::Term(token.span, token.value));
-        if let Err(_) = tokens.expect(|t| matches!(t, TokenValue::Comma)) {
+        if tokens.expect(|t| matches!(t, TokenValue::Comma)).is_err() {
             break;
         }
     }
