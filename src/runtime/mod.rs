@@ -3,11 +3,13 @@ pub mod object;
 mod operations;
 pub mod scope;
 
+use crate::slim::{get_parse_err_msg, execute_tree};
+use std::fs;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::parser::{Expr, Statement, Token, Block, TokenValue, Span};
+use crate::parser::{Expr, Statement, Token, Block, TokenValue, Span, parse_ast, ParseError};
 use crate::runtime::object::{ObjectRef, TraitDef};
 use crate::runtime::scope::Scope;
 
@@ -56,6 +58,8 @@ mod tests;
 
 pub fn evaluate_stmt(scope: &mut Scope, stm: &Statement) -> EResult<()> {
     match stm {
+        Statement::Import { span, path, name } => eval_import(scope, span, path, name),
+        Statement::ImportNames { span, path, names } => eval_import_names(scope, span, path, names),
         Statement::DefStruct { span, name, props } => eval_def_struct(scope, span, name, props),
         Statement::ImplFor { span, name, target } => eval_impl_for(scope, span, name, target),
         Statement::Trait { span, name, methods } => eval_declare_trait(scope, span, name, methods),
@@ -65,7 +69,7 @@ pub fn evaluate_stmt(scope: &mut Scope, stm: &Statement) -> EResult<()> {
 
 pub fn evaluate(scope: &mut Scope, expr: &Expr) -> EResult<ObjectRef> {
     match expr {
-        Expr::Nil(span) => nil!(),
+        Expr::Nil(_) => nil!(),
         Expr::Struct { span, name, props } => eval_struct(scope, span, name, props),
         Expr::Pipe { span, parent, child } => eval_pipe(scope, span, parent, child),
         Expr::Call { span, target, args } => eval_call(scope, span, target, args),
@@ -102,7 +106,7 @@ pub fn evaluate(scope: &mut Scope, expr: &Expr) -> EResult<ObjectRef> {
         Expr::Sequence(span, items) => eval_sequence(scope, items),
         Expr::Term(span, token) => eval_term(scope, span, token),
         Expr::Assign { span, target, value } => eval_assign(scope, span, target, value),
-        _ => todo!(),
+        e => todo!(),
     }
 }
 
@@ -794,4 +798,51 @@ fn eval_access(scope: &mut Scope, span: &Span, target: &Expr, field: &Expr) -> E
         };
         Ok(t)
     }
+}
+
+fn eval_import_names(scope: &mut Scope, span: &Span, path: &str, names: &[String]) -> EResult<()> {
+    let mut temp = Scope::default();
+    let program = fs::read_to_string(path).map_err(|e| RuntimeError(span.to_owned(), e.to_string()))?;
+    let ast = match parse_ast(&program) {
+        Ok(ast) => ast,
+        Err(ParseError::Interrupt(e, t)) => {
+            Err(RuntimeError(span.to_owned(), get_parse_err_msg(t, e, &program)))?
+        }
+        Err(ParseError::Continue) => {
+            panic!("bug in parser")
+        }
+    };
+
+    let _ = execute_tree(&mut temp, &ast)?;
+    for name in names {
+        if let Some(object) = temp.get(name) {
+            scope.set(name, object);
+        } else {
+            rt_err!(span, "No variable named: {}", name)?
+        }
+    };
+
+    scope.trait_defs.extend(temp.trait_defs.into_iter());
+    scope.trait_impls.extend(temp.trait_impls.into_iter());
+    Ok(())
+}
+
+fn eval_import(scope: &mut Scope, span: &Span, path: &str, name: &str) -> EResult<()> {
+    let mut temp = Scope::default();
+    let program = fs::read_to_string(path).map_err(|e| RuntimeError(span.to_owned(), e.to_string()))?;
+    let ast = match parse_ast(&program) {
+        Ok(ast) => ast,
+        Err(ParseError::Interrupt(e, t)) => {
+            Err(RuntimeError(span.to_owned(), get_parse_err_msg(t, e, &program)))?
+        }
+        Err(ParseError::Continue) => {
+            panic!("bug in parser")
+        }
+    };
+
+    let _ = execute_tree(&mut temp, &ast)?;
+    scope.set(name, Object::Collection(temp.store).into());
+    scope.trait_defs.extend(temp.trait_defs.into_iter());
+    scope.trait_impls.extend(temp.trait_impls.into_iter());
+    Ok(())
 }

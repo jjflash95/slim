@@ -45,6 +45,8 @@ impl Block {
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Statement {
+    ImportNames { span: Span, path: String, names: Vec<String> },
+    Import { span: Span, path: String, name: String },
     Trait { span: Span, name: Token, methods: Vec<Expr> },
     ImplFor { span: Span, name: Token, target: Token },
     Impl { span: Span, target: Token, methods: Vec<Expr> },
@@ -223,10 +225,33 @@ pub fn parse(tokens: &mut TokenStream) -> PResult<Block> {
 
 fn parse_statement(tokens: &mut TokenStream) -> PResult<Statement> {
     [
+        parse_from_import,
+        parse_import,
         parse_impl,
         parse_struct_def,
         parse_trait,
     ].run(tokens)
+}
+
+fn parse_from_import(tokens: &mut TokenStream) -> PResult<Statement> {
+    let span = tokens.expect(|t| matches!(t, TokenValue::From)).map_err(|_| ParseError::Continue)?.span;
+    let path = tokens.expect(|t| matches!(t, TokenValue::Str(_)))?.value.str();
+    let mut names = Vec::new();
+    if let Ok(_) = tokens.expect(|t| matches!(t, TokenValue::LBrace)) {
+        names = comma_separated(|tokens| {
+            tokens.expect_identifier().map(|t| t.value.identifier())
+        })(tokens);
+        let _ = tokens.expect(|t| matches!(t, TokenValue::RBrace))?;
+    }
+    Ok(Statement::ImportNames { span, path, names })
+}
+
+fn parse_import(tokens: &mut TokenStream) -> PResult<Statement> {
+    let span = tokens.expect(|t| matches!(t, TokenValue::Import)).map_err(|_| ParseError::Continue)?.span;
+    let path = tokens.expect(|t| matches!(t, TokenValue::Str(_)))?.value.str();
+    let _ = tokens.expect(|t| matches!(t, TokenValue::As))?;
+    let name = tokens.expect_identifier()?.value.identifier();
+    Ok(Statement::Import { span, path, name })
 }
 
 fn parse_expression(tokens: &mut TokenStream) -> PResult<Expr> {

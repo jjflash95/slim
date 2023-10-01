@@ -65,6 +65,9 @@ impl<'a> CharArray<'a> {
 pub enum TokenValue {
     #[default]
     EOF,
+    As,
+    Import,
+    From,
 
     LParen,
     RParen,
@@ -133,6 +136,14 @@ impl TokenValue {
             value
         } else {
             panic!("Not an identifier")
+        }
+    }
+
+    pub fn str(self) -> String {
+        if let TokenValue::Str(value) = self {
+            value
+        } else {
+            panic!("Not a string")
         }
     }
 }
@@ -475,7 +486,25 @@ fn next_token(chars: &mut CharArray) -> Option<Token> {
                 )
             }
         }
-        '*' | '/' | '+' | '-' | '%' | ':' => Some(
+        '/' => {
+            match chars.peek() {
+                Some('/') => {
+                    while let Some(c) = chars.next() {
+                        if c == '\n' {
+                            break;
+                        }
+                    };
+                    next_token(chars)
+                }
+                _ => Some(
+                    Token {
+                        value: TokenValue::Slash,
+                        span
+                    }
+                )
+            }
+        }
+        '*' | '+' | '-' | '%' | ':' => Some(
             char.try_into().map(|value| {
                 Token {
                     value,
