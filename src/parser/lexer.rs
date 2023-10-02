@@ -67,6 +67,7 @@ impl<'a> CharArray<'a> {
 pub enum TokenValue {
     #[default]
     EOF,
+    At,
     As,
     Import,
     From,
@@ -83,7 +84,6 @@ pub enum TokenValue {
     Semicolon,
     Mutate,
 
-    New,
     Trait,
     Impl,
     While,
@@ -189,6 +189,7 @@ impl TryInto<TokenValue> for char {
 
     fn try_into(self) -> Result<TokenValue, Self::Error> {
         match self {
+            '@' => Ok(TokenValue::At),
             '?' => Ok(TokenValue::QuestionMark),
             ':' => Ok(TokenValue::Semicolon),
             '*' => Ok(TokenValue::Star),
@@ -216,7 +217,6 @@ impl From<String> for TokenValue {
             "in" => TokenValue::In,
             "else" => TokenValue::Else,
             "for" => TokenValue::For,
-            "new" => TokenValue::New,
             "while" => TokenValue::While,
             "loop" => TokenValue::Loop,
             "return" => TokenValue::Return,
@@ -464,7 +464,7 @@ fn next_token(chars: &mut CharArray) -> Option<Token> {
                 span,
             }),
         },
-        '*' | '+' | '-' | '%' | ':' | '?' => {
+        '*' | '+' | '-' | '%' | ':' | '?' | '@' => {
             Some(char.try_into().map(|value| Token { value, span }).unwrap())
         }
         '"' => parse_str(chars, span, '"'),
@@ -477,7 +477,7 @@ fn next_token(chars: &mut CharArray) -> Option<Token> {
             } else {
                 dbg!(c, c, c);
                 dbg!(chars.clone().chars.collect::<String>());
-                panic!("XcharD")
+                panic!("wtf is this char")
             }
         }
     }

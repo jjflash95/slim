@@ -158,14 +158,14 @@ impl Number for float
 impl Common for *
 
 fn ok(value) {
-	return new Result {
+	return @ Result {
 		value: value,
 		error: nil,
 	}
 }
 
 fn err(msg) {
-	return new Result {
+	return @ Result {
 		value: nil,
 		error: msg,
 	}
@@ -180,7 +180,7 @@ http = {
 io = {
 	file: {
 		open: fn(name, mode) {
-			return new File {
+			return @ File {
 				name: name,
 				mode: mode,
 			}

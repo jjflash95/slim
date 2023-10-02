@@ -670,7 +670,7 @@ fn parse_continue(tokens: &mut TokenStream) -> PResult<Expr> {
 
 fn parse_struct_create(tokens: &mut TokenStream) -> PResult<Expr> {
     let span = tokens
-        .expect(|t| matches!(t, TokenValue::New))
+        .expect(|t| matches!(t, TokenValue::At))
         .map_err(|_| ParseError::Continue)?
         .span;
     let name = tokens.expect_identifier()?;

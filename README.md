@@ -35,7 +35,7 @@ impl Cons {
         curr = self.head
         return loop {
             if curr.next == nil {
-                curr.next = new Node { value: value, next: nil }
+                curr.next = @ Node { value: value, next: nil }
                 break self
             }
             curr = curr.next
@@ -44,8 +44,8 @@ impl Cons {
 }
 
 list = fn() {
-    return new Cons {
-        head: new Node {
+    return @ Cons {
+        head: @ Node {
             value: 1,
             next: nil
         }
