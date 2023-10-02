@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use crate::nil;
 use crate::parser::Span;
+use crate::rt_err;
 use crate::runtime::builtins::next_arg;
 use crate::runtime::builtins::BuiltinFunc;
 use crate::runtime::object::{Object, ObjectRef, ToObject};
@@ -16,15 +17,15 @@ use std::{
 
 pub fn listen(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     let host: String = next_arg(&mut args, "host")
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .object()
         .try_into()
-        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+        .map_err(|s| rt_err!(span, "{}", s))?;
     let port: i128 = next_arg(&mut args, "port")
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .object()
         .try_into()
-        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+        .map_err(|s| rt_err!(span, "{}", s))?;
     let listener = TcpListener::bind((host.as_str(), port as u16)).unwrap();
 
     if let Ok((stream, _)) = listener.accept() {
@@ -43,7 +44,7 @@ pub fn listen(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<O
                 .remove(0)
                 .object()
                 .try_into()
-                .map_err(|s| RuntimeError(span.to_owned(), s))?;
+                .map_err(|s| rt_err!(span, "{}", s))?;
             let mut buf = t.as_bytes();
             while !buf.is_empty() {
                 let res = (*writer).borrow_mut().write(buf);
@@ -51,9 +52,9 @@ pub fn listen(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<O
                     Ok(0) => break,
                     Ok(n) => buf = &buf[n..],
                     Err(_) => {
-                        return Err(RuntimeError(
-                            span.to_owned(),
-                            "Failed socket.write".to_owned(),
+                        return Err(rt_err!(
+                            span,
+                            "Failed socket.write",
                         ))
                     }
                 };
@@ -85,6 +86,6 @@ pub fn listen(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<O
         ]);
         Ok(Object::Collection(fields).into())
     } else {
-        nil!()
+        Err(rt_err!(span, "Failed to accept connection"))
     }
 }

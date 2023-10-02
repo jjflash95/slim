@@ -1,4 +1,6 @@
 mod net;
+mod filesystem;
+mod requests;
 
 use std::cell::RefCell;
 use std::time::SystemTime;
@@ -14,15 +16,14 @@ use super::{
     scope::Scope,
     EResult,
 };
-use net::listen;
 
 pub fn split(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
-    let arg = next_arg(&mut args, "string").map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let arg = next_arg(&mut args, "string").map_err(|s| rt_err!(span, "{}", s))?;
     let sep: String = next_arg(&mut args, "separator")
         .unwrap_or_else(|_| Rc::new(RefCell::new(Object::Str("".to_string()))))
         .object()
         .try_into()
-        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+        .map_err(|s| rt_err!(span, "{}", s))?;
 
     Ok(match arg.object() {
         Object::Str(s) => match sep.as_str() {
@@ -39,25 +40,26 @@ pub fn split(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
             )
             .into(),
         },
-        _ => Err(RuntimeError(
-            span.to_owned(),
-            format!("Expected string but got <{:?}> instead", arg),
+        _ => Err(rt_err!(
+            span,
+            "Expected string but got <{:?}> instead",
+            arg,
         ))?,
     })
 }
 
 fn pop(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     if args.len() != 1 {
-        return rt_err!(span, "pop takes 1 argument");
+        return Err(rt_err!(span, "pop takes 1 argument"));
     }
     let mut arg = args[0].borrow_mut();
     if let Object::Sequence(s) = &mut *arg {
-        return s.pop().ok_or(RuntimeError(
-            span.to_owned(),
-            "Cannot pop from empty sequence".into(),
+        return s.pop().ok_or(rt_err!(
+            span,
+            "Cannot pop from empty sequence",
         ));
     }
-    rt_err!(span, "pop takes a sequence")
+    Err(rt_err!(span, "pop takes a sequence"))
 }
 
 fn clear(_: &mut Scope, _span: &Span, _: Vec<ObjectRef>) -> EResult<ObjectRef> {
@@ -95,42 +97,42 @@ fn input(_: &mut Scope, _span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef
 
 pub fn slice(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     if args.len() < 3 {
-        return rt_err!(span, "Slice needs 3 arguments");
+        return Err(rt_err!(span, "Slice needs 3 arguments"));
     }
 
     let iterable = next_arg(&mut args, "sequence")
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .object();
     let start: i128 = next_arg(&mut args, "start")
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .object()
         .try_into()
-        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+        .map_err(|s| rt_err!(span, "{}", s))?;
     let end: i128 = next_arg(&mut args, "end")
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .object()
         .try_into()
-        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+        .map_err(|s| rt_err!(span, "{}", s))?;
     match iterable {
         Object::Sequence(seq) => {
             Ok(Object::Sequence(seq[start as usize..end as usize].into()).into())
         }
         Object::Str(s) => Ok(Object::Str(s[start as usize..end as usize].to_string()).into()),
-        _ => rt_err!(span, "Slice needs a sequence or string as first argument"),
+        _ => Err(rt_err!(span, "Slice needs a sequence or string as first argument")),
     }
 }
 
 fn rand(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     let lower: i128 = next_arg(&mut args, "lower")
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .object()
         .try_into()
-        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+        .map_err(|s| rt_err!(span, "{}", s))?;
     let upper: i128 = next_arg(&mut args, "upper")
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .object()
         .try_into()
-        .map_err(|s| RuntimeError(span.to_owned(), s))?;
+        .map_err(|s| rt_err!(span, "{}", s))?;
     let mut seed = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -144,13 +146,13 @@ fn rand(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectR
 
 fn len(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     if args.len() != 1 {
-        return rt_err!(span, "len takes 1 argument");
+        return Err(rt_err!(span, "len takes 1 argument"));
     }
     let arg = args[0].borrow();
     match &*arg {
         Object::Sequence(s) => Ok(Object::Int(s.len() as i128).into()),
         Object::Str(s) => Ok(Object::Int(s.len() as i128).into()),
-        _ => rt_err!(span, "len takes a sequence or string"),
+        _ => Err(rt_err!(span, "len takes a sequence or string")),
     }
 }
 
@@ -163,30 +165,42 @@ fn concat(_: &mut Scope, _span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRe
 }
 
 fn uppercase(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
-    let arg = next_arg(&mut args, "string").map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let arg = next_arg(&mut args, "string").map_err(|s| rt_err!(span, "{}", s))?;
     Ok(match arg.object() {
         Object::Str(s) => Object::Str(s.to_uppercase()).into(),
-        _ => Err(RuntimeError(
-            span.to_owned(),
-            format!("Expected string but got `{:?}` instead", arg),
+        _ => Err(rt_err!(
+            span,
+            "Expected string but got `{:?}` instead",
+            arg,
         ))?,
     })
 }
 
 fn lowercase(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
-    let arg = next_arg(&mut args, "string").map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let arg = next_arg(&mut args, "string").map_err(|s| rt_err!(span, "{}", s))?;
     Ok(match arg.object() {
         Object::Str(s) => Object::Str(s.to_lowercase()).into(),
-        _ => Err(RuntimeError(
-            span.to_owned(),
-            format!("Expected string but got `{:?}` instead", arg),
+        _ => Err(rt_err!(
+            span,
+            "Expected string but got `{:?}` instead",
+            arg,
         ))?,
     })
 }
 
 fn to_string(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
-    let arg = next_arg(&mut args, "string").map_err(|s| RuntimeError(span.to_owned(), s))?;
+    let arg = next_arg(&mut args, "string").map_err(|s| rt_err!(span, "{}", s))?;
     Ok(Object::Str(arg.object().to_string()).into())
+}
+
+fn _type(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
+    let arg = next_arg(&mut args, "type").map_err(|s| rt_err!(span, "{}", s))?;
+    Ok(Object::Str(arg.object()._type().to_string()).into())
+}
+
+fn _panic(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
+    let arg = next_arg(&mut args, "panic").map_err(|s| rt_err!(span, "{}", s))?;
+    Err(rt_err!(span, "Panic: {}", arg.object()))
 }
 
 fn next_arg(args: &mut Vec<Rc<RefCell<Object>>>, arg: &str) -> Result<ObjectRef, String> {
@@ -199,7 +213,9 @@ fn next_arg(args: &mut Vec<Rc<RefCell<Object>>>, arg: &str) -> Result<ObjectRef,
 
 fn get_builtins() -> Vec<(&'static str, BuiltinClosure)> {
     vec![
-        ("listen", wrap(listen)),
+        ("fread", wrap(filesystem::read)),
+        ("http_get", wrap(requests::get)),
+        ("listen", wrap(net::listen)),
         ("to_string", wrap(to_string)),
         ("lowercase", wrap(lowercase)),
         ("uppercase", wrap(uppercase)),
@@ -213,6 +229,8 @@ fn get_builtins() -> Vec<(&'static str, BuiltinClosure)> {
         ("dbg", wrap(dbg)),
         ("print", wrap(print)),
         ("pop", wrap(pop)),
+        ("type", wrap(_type)),
+        ("panic", wrap(_panic)),
     ]
 }
 

@@ -13,11 +13,18 @@ use crate::parser::{parse_ast, Block, Expr, ParseError, Span, Statement, Token, 
 use crate::runtime::object::{ObjectRef, TraitDef};
 use crate::runtime::scope::Scope;
 
-use self::object::{BuiltinFunc, Object, ToObject};
+use self::object::{BuiltinFunc, Object, ToObject, Type};
 use self::operations::{BinOps, UnaryOps};
 
 #[derive(Debug)]
-pub struct RuntimeError(pub Span, pub String);
+pub struct RuntimeError(pub Vec<Span>, pub String);
+
+impl RuntimeError {
+    fn add_span(mut self, span: &Span) -> Self {
+        self.0.push(span.to_owned());
+        self
+    }
+}
 
 pub type EResult<T> = Result<T, RuntimeError>;
 
@@ -31,10 +38,10 @@ macro_rules! nil {
 #[macro_export]
 macro_rules! rt_err {
     ($span: ident, $template:literal $(,)?) => {
-        Err(RuntimeError($span.to_owned(), String::from($template)))
+        RuntimeError(vec![$span.to_owned()], String::from($template))
     };
     ($span: ident, $template:literal, $($expr:expr),+ $(,)?) => {
-        Err(RuntimeError($span.to_owned(), format!($template, $($expr),+)))
+        RuntimeError(vec![$span.to_owned()], format!($template, $($expr),+))
     };
 }
 
@@ -97,7 +104,7 @@ pub fn evaluate(scope: &mut Scope, expr: &Expr) -> EResult<ObjectRef> {
                 &mut vec![],
             )? {
                 Bubble::Eval(v) | Bubble::Break(v) => Ok(v),
-                bubble => rt_err!(span, "Unexpected {:?}", bubble),
+                bubble => Err(rt_err!(span, "Unexpected {:?}", bubble)),
             }
         }
         Expr::For {
@@ -107,18 +114,18 @@ pub fn evaluate(scope: &mut Scope, expr: &Expr) -> EResult<ObjectRef> {
             body,
         } => match eval_for_with(scope, span, pin, iterable, body, &mut vec![])? {
             Bubble::Break(v) | Bubble::Eval(v) => Ok(v),
-            bubble => rt_err!(span, "Unexpected {:?}", bubble),
+            bubble => Err(rt_err!(span, "Unexpected {:?}", bubble)),
         },
         Expr::Conditional { span, branches } => {
             match eval_branches_with(scope, span, branches, &mut vec![])? {
                 Bubble::Eval(v) => Ok(v),
-                bubble => rt_err!(span, "Cannot call {:?} outside a loop/function", bubble),
+                bubble => Err(rt_err!(span, "Cannot call {:?} outside a loop/function", bubble)),
             }
         }
         Expr::While { span, pin, body } => {
             match eval_while_with(scope, span, pin, body, &mut vec![])? {
                 Bubble::Eval(v) | Bubble::Break(v) => Ok(v),
-                bubble => rt_err!(span, "Unexpected {:?}", bubble),
+                bubble => Err(rt_err!(span, "Unexpected {:?}", bubble)),
             }
         }
         Expr::Scope(span, body) => eval_scope(scope, span, body),
@@ -155,20 +162,20 @@ fn eval_term(scope: &mut Scope, span: &Span, token: &TokenValue) -> EResult<Obje
             span: span.to_owned(),
             value: token.to_owned(),
         })
-        .map_err(|s| RuntimeError(span.to_owned(), s))?),
+        .map_err(|s| RuntimeError(vec![span.to_owned()], s))?),
     }
 }
 
 fn eval_self(scope: &mut Scope, span: &Span) -> EResult<ObjectRef> {
     scope
         .get("self")
-        .ok_or(RuntimeError(span.to_owned(), "No self in scope".into()))
+        .ok_or(RuntimeError(vec![span.to_owned()], "No self in scope".into()))
 }
 
 fn eval_struct(scope: &mut Scope, span: &Span, name: &str, props: &[Expr]) -> EResult<ObjectRef> {
     let rules = scope
         .get_struct_def(name)
-        .ok_or_else(|| RuntimeError(span.to_owned(), format!("Struct {} does not exist", name)))?;
+        .ok_or_else(|| RuntimeError(vec![span.to_owned()], format!("Struct {} does not exist", name)))?;
     let props = props
         .iter()
         .map(|e| {
@@ -179,24 +186,24 @@ fn eval_struct(scope: &mut Scope, span: &Span, name: &str, props: &[Expr]) -> ER
             } = e
             {
                 let Expr::Term(ref span, ref t) = **target else {
-                    rt_err!(span, "XD")?
+                    Err(rt_err!(span, "XD"))?
                 };
                 if let TokenValue::Identifier(name) = t {
                     return Ok((name.to_owned(), evaluate(scope, value)?));
                 }
-                rt_err!(
+                Err(rt_err!(
                     span,
                     "Expected term inside collection but found: {:?}",
                     target
-                )?
+                ))?
             } else {
-                rt_err!(span, "Expected assign inside collection, found: {:?}", e)?
+                Err(rt_err!(span, "Expected assign inside collection, found: {:?}", e))?
             }
         })
         .collect::<EResult<HashMap<String, ObjectRef>>>()?;
     for prop in &rules {
         if !props.contains_key(prop) {
-            rt_err!(span, "Missing field {} for struct {}", prop, name)?
+            Err(rt_err!(span, "Missing field {} for struct {}", prop, name))?
         }
     }
     Ok(Object::Struct {
@@ -214,11 +221,15 @@ fn eval_def_struct(scope: &mut Scope, _: &Span, name: &str, props: &[String]) ->
 
 fn eval_impl_for(scope: &mut Scope, span: &Span, _name: &Token, _target: &Token) -> EResult<()> {
     match (&_name.value, &_target.value) {
-        (TokenValue::Identifier(name), TokenValue::Identifier(target)) => {
+        (TokenValue::Identifier(name), t) => {
+            if !matches!(t, TokenValue::Identifier(_) | TokenValue::Star) {
+                Err(rt_err!(span, "Cannot impl {:?} for {:?}", name, t))?
+            };
+        
             let def = scope.trait_defs.get(name).cloned().ok_or_else(|| {
                 RuntimeError(
-                    _target.span.to_owned(),
-                    format!("impl {}: trait {} does not exist", target, name),
+                    vec![_target.span.to_owned()],
+                    format!("impl {:?}: trait {} does not exist", t, name),
                 )
             })?;
             let mut methods = HashMap::new();
@@ -229,25 +240,31 @@ fn eval_impl_for(scope: &mut Scope, span: &Span, _name: &Token, _target: &Token)
                 {
                     let name = name.clone().ok_or_else(|| {
                         RuntimeError(
-                            _target.span.to_owned(),
+                            vec![ _target.span.to_owned()],
                             "Cannot implement anonymous trait functions".into(),
                         )
                     })?;
                     methods.insert(name, _eval_func(scope, span, None, &params, &body)?.1);
                 } else {
-                    rt_err!(span, "Found non-function in trait impl")?
+                    Err(rt_err!(span, "Found non-function in trait impl"))?
                 }
             }
-            scope.add_trait(target.clone().into(), methods);
+            let _type = match t {
+                TokenValue::Star => Type::Any,
+                TokenValue::Identifier(name) => name.to_owned().into(),
+                _ => unreachable!(),
+            };
+
+            scope.add_trait(_type, methods);
             Ok(())
         }
-        (n, t) => rt_err!(span, "Cannot impl {:?} for {:?}", n, t),
+        (n, t) => Err(rt_err!(span, "Cannot impl {:?} for {:?}", n, t)),
     }
 }
 
 fn eval_impl(scope: &mut Scope, span: &Span, target: &Token, _methods: &[Expr]) -> EResult<()> {
     let TokenValue::Identifier(target) = &target.value else {
-        return rt_err!(span, "Cannot eval impl");
+        return Err(rt_err!(span, "Cannot eval impl"));
     };
     let mut methods = HashMap::new();
     for f in _methods {
@@ -256,12 +273,12 @@ fn eval_impl(scope: &mut Scope, span: &Span, target: &Token, _methods: &[Expr]) 
         } = f
         {
             let name = name.clone().ok_or(RuntimeError(
-                span.to_owned(),
+                vec![span.to_owned()],
                 "Cannot implement anonymous trait functions".into(),
             ))?;
             methods.insert(name, _eval_func(scope, span, None, params, body)?.1);
         } else {
-            rt_err!(span, "Found non-function in trait impl")?
+            Err(rt_err!(span, "Found non-function in trait impl"))?
         }
     }
     scope.add_trait(target.clone().into(), methods);
@@ -275,11 +292,11 @@ fn eval_declare_trait(
     methods: &[Expr],
 ) -> EResult<()> {
     let TokenValue::Identifier(name) = &name.value else {
-        return rt_err!(span, "Cannot eval trait");
+        return Err(rt_err!(span, "Cannot eval trait"));
     };
     for m in methods {
         if !matches!(m, Expr::Func { .. }) {
-            rt_err!(span, "Trait methods must be functions")?
+            Err(rt_err!(span, "Trait methods must be functions"))?
         }
     }
     scope.add_trait_def(
@@ -303,7 +320,7 @@ fn eval_pipe(scope: &mut Scope, span: &Span, parent: &Expr, child: &Expr) -> ERe
             arguments.extend(args);
             target
         }
-        e => rt_err!(span, "Cannot use: {:?} as callable", e)?,
+        e => Err(rt_err!(span, "Cannot use: {:?} as callable", e))?,
     };
     let arguments = arguments.into_iter().cloned().collect::<Vec<Expr>>();
     eval_call(scope, span, f, &arguments)
@@ -325,7 +342,7 @@ fn eval_while_with(
                     if interrupts.contains(&Interrupts::Return) {
                         return Ok(Bubble::Return(evaluate(scope, e)?));
                     }
-                    rt_err!(span, "Cannot return from outside a function")?
+                    Err(rt_err!(span, "Cannot return from outside a function"))?
                 }
                 Block::Expression(Expr::Break(_span, v)) => {
                     return Ok(Bubble::Break(evaluate(scope, v)?))
@@ -417,7 +434,7 @@ fn eval_for_with(
     for item in sequence
         .object()
         .into_vec()
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .into_iter()
     {
         if let Expr::Term(_, TokenValue::Identifier(ref name)) = pin {
@@ -430,7 +447,7 @@ fn eval_for_with(
                     if interrupts.contains(&Interrupts::Return) {
                         return Ok(Bubble::Return(evaluate(scope, e)?));
                     }
-                    rt_err!(span, "Cannot return from outside a function")?
+                    Err(rt_err!(span, "Cannot return from outside a function"))?
                 }
                 Block::Expression(Expr::Break(_span, v)) => {
                     return Ok(Bubble::Break(evaluate(scope, v)?))
@@ -518,19 +535,19 @@ fn eval_interruptable_expr(
             if interrupts.contains(&Interrupts::Return) {
                 return Ok(Bubble::Return(evaluate(scope, e)?));
             }
-            rt_err!(span, "Cannot return from outside a function")?
+            Err(rt_err!(span, "Cannot return from outside a function"))?
         }
         Expr::Break(span, v) => {
             if interrupts.contains(&Interrupts::Break) {
                 return Ok(Bubble::Break(evaluate(scope, v)?));
             }
-            rt_err!(span, "Cannot call break from outside a loop")?
+            Err(rt_err!(span, "Cannot call break from outside a loop"))?
         }
         Expr::Continue(span) => {
             if interrupts.contains(&Interrupts::Continue) {
                 return Ok(Bubble::Continue);
             }
-            rt_err!(span, "Cannot call continue from outside a loop")?
+            Err(rt_err!(span, "Cannot call continue from outside a loop"))?
         }
         _ => panic!("Should never come to this"),
     }
@@ -611,7 +628,7 @@ fn eval_binary(
     let right = right.object();
     Ok(left
         .binary(op, right)
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .into())
 }
 
@@ -631,7 +648,7 @@ fn eval_scope(scope: &mut Scope, _span: &Span, body: &[Block]) -> EResult<Object
                 &mut vec![Interrupts::Return],
             )? {
                 Bubble::Return(v) => return Ok(v),
-                Bubble::Continue => rt_err!(span, "Cannot call continue outside loop")?,
+                Bubble::Continue => Err(rt_err!(span, "Cannot call continue outside loop"))?,
                 Bubble::Eval(v) => last = v,
                 _ => {} // eval & break get ignored
             },
@@ -649,7 +666,7 @@ fn eval_scope(scope: &mut Scope, _span: &Span, body: &[Block]) -> EResult<Object
                 &mut vec![Interrupts::Return],
             )? {
                 Bubble::Return(v) => return Ok(v),
-                Bubble::Continue => rt_err!(span, "Cannot call continue outside loop")?,
+                Bubble::Continue => Err(rt_err!(span, "Cannot call continue outside loop"))?,
                 Bubble::Eval(v) => last = v,
                 _ => {} // eval & break get ignored
             },
@@ -657,8 +674,8 @@ fn eval_scope(scope: &mut Scope, _span: &Span, body: &[Block]) -> EResult<Object
                 match eval_branches_with(&mut inner, span, branches, &mut vec![Interrupts::Return])?
                 {
                     Bubble::Return(v) => return Ok(v),
-                    Bubble::Continue => rt_err!(span, "Cannot call continue outside loop")?,
-                    Bubble::Break(_) => rt_err!(span, "Cannot call break outside loop")?,
+                    Bubble::Continue => Err(rt_err!(span, "Cannot call continue outside loop"))?,
+                    Bubble::Break(_) => Err(rt_err!(span, "Cannot call break outside loop"))?,
                     Bubble::Eval(v) => last = v,
                 }
             }
@@ -675,6 +692,7 @@ fn eval_scope(scope: &mut Scope, _span: &Span, body: &[Block]) -> EResult<Object
 
 fn eval_call_func(
     scope: &mut Scope,
+    span: &Span,
     _: Option<String>,
     params: &[String],
     locals: Option<HashMap<String, ObjectRef>>,
@@ -688,13 +706,22 @@ fn eval_call_func(
         inner.store = locals;
     }
 
+    if params.len() != args.len() {
+        Err(rt_err!(
+            span,
+            "Expected {} arguments but found {}",
+            params.len(),
+            args.len()
+        ))?
+    };
+
     for (param, arg) in params.iter().zip(args) {
         inner.store.insert(param.clone(), arg);
     }
 
     for expr in body {
         match expr {
-            Block::Expression(Expr::Return(_span, e)) => return evaluate(&mut inner, e),
+            Block::Expression(Expr::Return(_span, e)) => return evaluate(&mut inner, e).map_err(|e| e.add_span(span)),
             Block::Expression(Expr::Loop { span, body }) => match eval_while_with(
                 &mut inner,
                 span,
@@ -703,13 +730,13 @@ fn eval_call_func(
                 &mut vec![Interrupts::Return],
             )? {
                 Bubble::Return(v) => return Ok(v),
-                Bubble::Continue => rt_err!(span, "Cannot call continue outside loop")?,
+                Bubble::Continue => Err(rt_err!(span, "Cannot call continue outside loop")).map_err(|e| e.add_span(span))?,
                 _ => {} // eval & break get ignored
             },
             Block::Expression(Expr::While { span, pin, body }) => {
                 match eval_while_with(&mut inner, span, pin, body, &mut vec![Interrupts::Return])? {
                     Bubble::Return(v) => return Ok(v),
-                    Bubble::Continue => rt_err!(span, "Cannot call continue outside loop")?,
+                    Bubble::Continue => Err(rt_err!(span, "Cannot call continue outside loop")).map_err(|e| e.add_span(span))?,
                     _ => {} // eval & break get ignored
                 }
             }
@@ -727,23 +754,23 @@ fn eval_call_func(
                 &mut vec![Interrupts::Return],
             )? {
                 Bubble::Return(v) => return Ok(v),
-                Bubble::Continue => rt_err!(span, "Cannot call continue outside loop")?,
+                Bubble::Continue => Err(rt_err!(span, "Cannot call continue outside loop")).map_err(|e| e.add_span(span))?,
                 _ => {} // eval & break get ignored
             },
             Block::Expression(Expr::Conditional { span, branches }) => {
                 match eval_branches_with(&mut inner, span, branches, &mut vec![Interrupts::Return])?
                 {
                     Bubble::Return(v) => return Ok(v),
-                    Bubble::Continue => rt_err!(span, "Cannot call continue outside loop")?,
-                    Bubble::Break(_) => rt_err!(span, "Cannot call break outside loop")?,
+                    Bubble::Continue => Err(rt_err!(span, "Cannot call continue outside loop")).map_err(|e| e.add_span(span))?,
+                    Bubble::Break(_) => Err(rt_err!(span, "Cannot call break outside loop")).map_err(|e| e.add_span(span))?,
                     _ => {} // eval & break
                 }
             }
             Block::Expression(e) => {
-                evaluate(&mut inner, e)?;
+                evaluate(&mut inner, e).map_err(|e| e.add_span(span))?;
             }
             Block::Statement(stm) => {
-                evaluate_stmt(&mut inner, stm)?;
+                evaluate_stmt(&mut inner, stm).map_err(|e| e.add_span(span))?;
             }
         }
     }
@@ -762,9 +789,9 @@ fn eval_call(scope: &mut Scope, span: &Span, f: &Expr, args: &[Expr]) -> EResult
             params,
             locals,
             body,
-        } => eval_call_func(scope, name, &params, locals, &body, args),
+        } => eval_call_func(scope, span, name, &params, locals, &body, args),
         Object::Builtin(BuiltinFunc(b)) => b(scope, span, args),
-        v => rt_err!(span, "Cannot call: {:?} as a function", v),
+        v => Err(rt_err!(span, "Cannot call: {:?} as a function", v)),
     }
 }
 
@@ -779,7 +806,7 @@ fn _eval_func(
         if let Expr::Term(_span, TokenValue::Identifier(arg)) = a {
             return Ok(arg.clone());
         }
-        rt_err!(span, "Expected arg but found: {:?}", a)
+        Err(rt_err!(span, "Expected arg but found: {:?}", a))
     });
 
     Ok((
@@ -813,7 +840,7 @@ fn eval_unary(scope: &mut Scope, span: &Span, op: &TokenValue, value: &Expr) -> 
     let object = evaluate(scope, value)?.object();
     Ok(object
         .unary(op)
-        .map_err(|s| RuntimeError(span.to_owned(), s))?
+        .map_err(|s| rt_err!(span, "{}", s))?
         .into())
 }
 
@@ -821,7 +848,7 @@ fn eval_identifier(scope: &mut Scope, span: &Span, i: &str) -> EResult<ObjectRef
     if let Some(object) = scope.get(i) {
         Ok(object)
     } else {
-        rt_err!(span, "No variable named: {}", i)
+        Err(rt_err!(span, "No variable named: {}", i))
     }
 }
 
@@ -844,7 +871,7 @@ fn eval_assign(scope: &mut Scope, span: &Span, target: &Expr, value: &Expr) -> E
         Expr::Deref(span, ref inner) => match &**inner {
             Expr::Term(span, TokenValue::Identifier(name)) => {
                 let prev = scope.get(name).ok_or_else(|| {
-                    RuntimeError(span.to_owned(), format!("No variable named: {}", name))
+                    rt_err!(span, "No variable named: {}", name)
                 })?;
                 prev.replace(oref.object());
                 nil!()
@@ -852,7 +879,7 @@ fn eval_assign(scope: &mut Scope, span: &Span, target: &Expr, value: &Expr) -> E
             Expr::Term(span, TokenValue::_Self) => {
                 let prev = scope
                     .get("self")
-                    .ok_or_else(|| RuntimeError(span.to_owned(), "No self in scope".to_string()))?;
+                    .ok_or_else(|| rt_err!(span, "No self in scope"))?;
                 prev.replace(oref.object());
                 nil!()
             }
@@ -861,9 +888,9 @@ fn eval_assign(scope: &mut Scope, span: &Span, target: &Expr, value: &Expr) -> E
                 target,
                 field,
             } => eval_access(scope, span, target, field),
-            inner => rt_err!(span, "Cannot deref expression: {:?}", inner),
+            inner => Err(rt_err!(span, "Cannot deref expression: {:?}", inner)),
         },
-        _ => rt_err!(span, "Cannot assign to expression: {:?}", target),
+        _ => Err(rt_err!(span, "Cannot assign to expression: {:?}", target)),
     }
 }
 
@@ -890,13 +917,13 @@ fn eval_collection(scope: &mut Scope, span: &Span, items: &[Expr]) -> EResult<Ob
                 if let Expr::Term(ref _span, TokenValue::Identifier(ref name)) = **target {
                     return Ok((name.to_owned(), evaluate(scope, value)?));
                 }
-                rt_err!(
+                Err(rt_err!(
                     span,
                     "Expected term inside collection but found: {:?}",
                     target
-                )?
+                ))?
             } else {
-                rt_err!(span, "Expected assign inside collection, found: {:?}", e)?
+                Err(rt_err!(span, "Expected assign inside collection, found: {:?}", e))?
             }
         })
         .collect::<EResult<HashMap<String, ObjectRef>>>()?;
@@ -913,7 +940,7 @@ fn eval_access(scope: &mut Scope, span: &Span, target: &Expr, field: &Expr) -> E
     } else {
         let t = src
             .get_trait(scope, field)
-            .map_err(|s| RuntimeError(span.to_owned(), s))?;
+            .map_err(|s| rt_err!(span, "{}", s))?;
         if let Object::Func {
             name,
             params,
@@ -938,24 +965,25 @@ fn eval_access(scope: &mut Scope, span: &Span, target: &Expr, field: &Expr) -> E
 fn eval_import_names(scope: &mut Scope, span: &Span, path: &str, names: &[String]) -> EResult<()> {
     let mut temp = Scope::default();
     let program =
-        fs::read_to_string(path).map_err(|e| RuntimeError(span.to_owned(), e.to_string()))?;
-    let ast = match parse_ast(&program) {
+        fs::read_to_string(path).map_err(|e| rt_err!(span, "{}", e.to_string())).map_err(|e| e.add_span(span))?;
+    let ast = match parse_ast(&program, Some(path.to_owned())) {
         Ok(ast) => ast,
-        Err(ParseError::Interrupt(e, t)) => Err(RuntimeError(
-            span.to_owned(),
-            get_parse_err_msg(t, e, &program),
+        Err(ParseError::Interrupt(e, t)) => Err(rt_err!(
+            span,
+            "{}",
+            get_parse_err_msg(t, e, None),
         ))?,
         Err(ParseError::Continue) => {
             panic!("bug in parser")
         }
     };
 
-    execute_tree(&mut temp, &ast)?;
+    execute_tree(&mut temp, &ast).map_err(|e| e.add_span(span))?;
     for name in names {
         if let Some(object) = temp.get(name) {
             scope.set(name, object);
         } else {
-            rt_err!(span, "No variable named: {}", name)?
+            Err(rt_err!(span, "No variable named: {}", name))?
         }
     }
 
@@ -967,19 +995,20 @@ fn eval_import_names(scope: &mut Scope, span: &Span, path: &str, names: &[String
 fn eval_import(scope: &mut Scope, span: &Span, path: &str, name: &str) -> EResult<()> {
     let mut temp = Scope::default();
     let program =
-        fs::read_to_string(path).map_err(|e| RuntimeError(span.to_owned(), e.to_string()))?;
-    let ast = match parse_ast(&program) {
+        fs::read_to_string(path).map_err(|e| rt_err!(span, "{}", e.to_string())).map_err(|e| e.add_span(span))?;
+    let ast = match parse_ast(&program, Some(path.to_owned())) {
         Ok(ast) => ast,
-        Err(ParseError::Interrupt(e, t)) => Err(RuntimeError(
-            span.to_owned(),
-            get_parse_err_msg(t, e, &program),
+        Err(ParseError::Interrupt(e, t)) => Err(rt_err!(
+            span,
+            "{}",
+            get_parse_err_msg(t, e, None),
         ))?,
         Err(ParseError::Continue) => {
             panic!("bug in parser")
         }
     };
 
-    execute_tree(&mut temp, &ast)?;
+    execute_tree(&mut temp, &ast).map_err(|e| e.add_span(span))?;
     scope.set(name, Object::Collection(temp.store).into());
     scope.trait_defs.extend(temp.trait_defs);
     scope.trait_impls.extend(temp.trait_impls);

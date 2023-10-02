@@ -8,6 +8,7 @@ use super::object::{StructProps, TraitDef, TraitImpl, Type};
 pub struct Scope {
     pub eval: Option<ObjectRef>,
     pub parent: Option<*mut Scope>,
+    pub builtins: HashMap<String, ObjectRef>,
     pub store: HashMap<String, ObjectRef>,
     pub trait_defs: HashMap<String, TraitDef>,
     pub trait_impls: HashMap<Type, TraitImpl>,
@@ -28,6 +29,8 @@ impl Scope {
 
     pub fn get(&mut self, key: &str) -> Option<ObjectRef> {
         if let Some(v) = self.store.get(key) {
+            return Some(Rc::clone(v));
+        } else if let Some(v) = self.builtins.get(key) {
             return Some(Rc::clone(v));
         } else if let Some(parent) = self.get_parent() {
             return parent.get(key);
@@ -70,11 +73,12 @@ impl Scope {
         self.store.insert(key.to_string(), value);
     }
 
+    pub fn add_builtin(&mut self, key: &str, value: ObjectRef) {
+        self.builtins.insert(key.to_string(), value);
+    }
+
     pub fn locals(&self) -> Option<HashMap<String, ObjectRef>> {
-        if self.parent.is_some() {
-            return Some(self.store.clone());
-        }
-        None
+        Some(self.store.clone())
     }
 
     pub fn root() -> Self {

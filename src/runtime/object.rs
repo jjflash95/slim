@@ -28,6 +28,7 @@ pub struct TraitDef {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Type {
+    Any,
     Nil,
     Bool,
     Int,
@@ -142,6 +143,24 @@ impl fmt::Debug for BuiltinFunc {
     }
 }
 
+impl Type {
+    pub fn to_string(self) -> String {
+        match self {
+            Type::Any => "*".into(),
+            Type::Nil => "nil".into(),
+            Type::Bool => "bool".into(),
+            Type::Int => "int".into(),
+            Type::Float => "float".into(),
+            Type::Str => "str".into(),
+            Type::Collection => "collection".into(),
+            Type::Sequence => "sequence".into(),
+            Type::Builtin => "builtin".into(),
+            Type::Func => "func".into(),
+            Type::Struct(name) => name,
+        }
+    }
+}
+
 impl From<String> for Type {
     fn from(val: String) -> Self {
         match val.as_str() {
@@ -177,9 +196,13 @@ impl Object {
 
     pub fn get_trait(&mut self, scope: &mut Scope, field: ObjectRef) -> Result<ObjectRef, String> {
         if let Object::Str(name) = field.borrow().clone() {
-            let traits = scope
+            let common = scope
+                .get_trait_impl(Type::Any)
+                .unwrap_or_default();
+            let mut traits = scope
                 .get_trait_impl(self._type())
-                .ok_or(format!("type {:?} has no traits", self._type()))?;
+                .unwrap_or_default();
+            let _ = traits.extend(common.into_iter());
             traits
                 .get(&name)
                 .cloned()

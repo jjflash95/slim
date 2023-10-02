@@ -98,6 +98,7 @@ pub enum TokenValue {
     Continue,
     Fn,
 
+    QuestionMark,
     Pipe,
     Eq,
     Ne,
@@ -188,6 +189,7 @@ impl TryInto<TokenValue> for char {
 
     fn try_into(self) -> Result<TokenValue, Self::Error> {
         match self {
+            '?' => Ok(TokenValue::QuestionMark),
             ':' => Ok(TokenValue::Semicolon),
             '*' => Ok(TokenValue::Star),
             '/' => Ok(TokenValue::Slash),
@@ -204,6 +206,9 @@ impl TryInto<TokenValue> for char {
 impl From<String> for TokenValue {
     fn from(value: String) -> Self {
         match value.as_str() {
+            "from" => TokenValue::From,
+            "import" => TokenValue::Import,
+            "as" => TokenValue::As,
             "trait" => TokenValue::Trait,
             "impl" => TokenValue::Impl,
             "struct" => TokenValue::Struct,
@@ -459,7 +464,7 @@ fn next_token(chars: &mut CharArray) -> Option<Token> {
                 span,
             }),
         },
-        '*' | '+' | '-' | '%' | ':' => {
+        '*' | '+' | '-' | '%' | ':' | '?' => {
             Some(char.try_into().map(|value| Token { value, span }).unwrap())
         }
         '"' => parse_str(chars, span, '"'),

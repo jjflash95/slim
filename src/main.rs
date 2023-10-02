@@ -1,5 +1,4 @@
 mod parser;
-mod prelude;
 mod runtime;
 mod slim;
 

@@ -1,0 +1,189 @@
+impl sequence {
+    fn contains(i) {
+        return for item in self {
+            if item == i {
+                break true
+            }
+            false
+        }
+    }
+	fn foreach(f) {
+		for item in self {
+			item << f(item)
+		}
+		return self
+	}
+
+	fn map(f) {
+		out = []
+		for item in self {
+			out[] = f(item)
+		}
+		return out
+	}
+
+	fn enumerate() {
+		out = []
+		count = 0
+		for item in self {
+			out[] = [count, item]
+			count = count + 1
+		}
+		return out
+	}
+
+	fn slice(start, end) {
+		return slice(self, start, end)
+	}
+
+	fn len() {
+		return len(self)
+	}
+
+	fn extend(list) {
+		for item in list {
+			self[] = item
+		}
+		return self
+	}
+
+	fn pop() {
+		return pop(self)
+	}
+
+	fn join(sep) {
+		out = ""
+		for i in self {
+			out = concat(out, concat(sep, i))
+		}
+		return out
+	}
+
+	fn head() {
+		return self[0]
+	}
+
+	fn tail() {
+		return self[self.len() - 1]
+	}
+}
+
+impl str {
+	fn split(sep) {
+		return split(self, sep)
+	}
+}
+
+impl File {
+	fn read() {
+		return fread(self.name)
+	}
+
+	fn write(data) {
+		return fwrite(self.name, data)
+	}
+
+	fn append(data) {
+		return fappend(self.name, data)
+	}
+}
+
+impl Result {
+	fn is_error() {
+		return self.error != nil
+	}
+	fn is_ok() {
+		return self.error == nil
+	}
+	fn unwrap() {
+		if self.error != nil {
+			panic(self.error)
+		}
+		return self.value
+	}
+}
+
+trait Number {
+    to_string() {
+		return to_string(self)
+	}
+
+    pow(n) {
+		c = self
+		for i in range(n) {
+			c = c * self
+		}
+		return c
+	}
+}
+
+trait Common {
+	expect(msg) {
+		if self == nil {
+			panic(msg)
+		}
+		return self
+	}
+
+	transform(f) {
+		self << f(self)
+		return self
+	}
+
+	replace(other) {
+		self << other
+		return self
+	}
+
+	on_nil(value) {
+		if self == nil {
+			return value
+		}
+		return self
+	}
+}
+
+struct Result {
+	value,
+	error,
+}
+
+struct File {
+	name,
+	mode,
+}
+
+impl Number for int
+impl Number for float
+impl Common for *
+
+fn ok(value) {
+	return new Result {
+		value: value,
+		error: nil,
+	}
+}
+
+fn err(msg) {
+	return new Result {
+		value: nil,
+		error: msg,
+	}
+}
+
+http = {
+	get: fn get(url) {
+		return http_get(url)
+	}
+}
+
+io = {
+	file: {
+		open: fn(name, mode) {
+			return new File {
+				name: name,
+				mode: mode,
+			}
+		}
+	}
+}

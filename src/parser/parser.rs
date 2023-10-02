@@ -75,6 +75,10 @@ pub enum Statement {
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Expr {
+    Optional {
+        span: Span,
+        inner: Box<Expr>,
+    },
     Assign {
         span: Span,
         target: Box<Expr>,
@@ -151,6 +155,7 @@ pub enum Expr {
 impl Expr {
     pub fn get_span(&self) -> &Span {
         match self {
+            Expr::Optional { span, .. } => span,
             Expr::Assign { span, .. } => span,
             Expr::Binary { span, .. } => span,
             Expr::Unary { span, .. } => span,
@@ -227,7 +232,7 @@ impl TokenStream {
         self.tokens.peek()
     }
 
-    fn next(&mut self) -> Option<Token> {
+    pub fn next(&mut self) -> Option<Token> {
         self.tokens.next()
     }
 }
@@ -236,7 +241,7 @@ pub fn parse(tokens: &mut TokenStream) -> PResult<Block> {
     if let Ok(stmt) = parse_statement(tokens) {
         Ok(Block::Statement(stmt))
     } else {
-        Ok(Block::Expression(parse_expression(tokens)?))
+        Ok(Block::Expression(parse_optional(tokens)?))
     }
 }
 
@@ -260,13 +265,22 @@ fn parse_from_import(tokens: &mut TokenStream) -> PResult<Statement> {
         .expect(|t| matches!(t, TokenValue::Str(_)))?
         .value
         .str();
-    let mut names = Vec::new();
-    if tokens.expect(|t| matches!(t, TokenValue::LBrace)).is_ok() {
-        names = comma_separated(|tokens| tokens.expect_identifier().map(|t| t.value.identifier()))(
-            tokens,
-        );
-        let _ = tokens.expect(|t| matches!(t, TokenValue::RBrace))?;
-    }
+
+    let _ = tokens.expect(|t| matches!(t, TokenValue::Import))?;
+    let _ = tokens.expect(|t| matches!(t, TokenValue::LBrace))?;
+    let names = comma_separated(parse_identifier)(
+        tokens,
+    ).into_iter().map(
+        |e| {
+            if let Expr::Term(_, TokenValue::Identifier(name)) = e {
+                name
+            } else {
+                panic!("Expected identifier")
+            }
+        }
+    ).collect();
+    let _ = tokens.expect(|t| matches!(t, TokenValue::RBrace))?;
+
     Ok(Statement::ImportNames { span, path, names })
 }
 
@@ -282,6 +296,15 @@ fn parse_import(tokens: &mut TokenStream) -> PResult<Statement> {
     let _ = tokens.expect(|t| matches!(t, TokenValue::As))?;
     let name = tokens.expect_identifier()?.value.identifier();
     Ok(Statement::Import { span, path, name })
+}
+
+fn parse_optional(tokens: &mut TokenStream) -> PResult<Expr> {
+    let inner = parse_expression(tokens)?;
+    if let Ok(o) = tokens.expect(|t| matches!(t, TokenValue::QuestionMark)) {
+        Ok(Expr::Optional { span: o.span, inner: Box::new(inner) })
+    } else {
+        Ok(inner)
+    }
 }
 
 fn parse_expression(tokens: &mut TokenStream) -> PResult<Expr> {
@@ -504,7 +527,7 @@ fn parse_access(tokens: &mut TokenStream) -> PResult<Expr> {
             }
             Some(token) if matches!(token.value, TokenValue::LParen) => {
                 let span = tokens.next().expect("checked").span;
-                let args = parse_args(tokens);
+                let args = parse_args(tokens)?;
                 let _ = tokens.expect(|t| matches!(t, TokenValue::RParen))?;
                 target = Expr::Call {
                     span,
@@ -529,16 +552,23 @@ fn parse_access(tokens: &mut TokenStream) -> PResult<Expr> {
     Ok(target)
 }
 
-fn parse_args(tokens: &mut TokenStream) -> Vec<Expr> {
+fn parse_args(tokens: &mut TokenStream) -> PResult<Vec<Expr>> {
     let mut args = Vec::new();
-    while let Ok(expr) = parse_expression(tokens) {
-        args.push(expr);
-        if tokens.expect(|t| matches!(t, TokenValue::Comma)).is_err() {
-            break;
+    loop {
+        match parse_expression(tokens) {
+            Ok(expr) => {
+                args.push(expr);
+                if let Err(_) = tokens.expect(|t| matches!(t, TokenValue::Comma)) {
+                    break
+                }
+            },
+            Err(ParseError::Continue) => break,
+            Err(e) => return Err(e),
         }
-    }
+    };
+
     tokens.next_if(|t| matches!(t, TokenValue::Comma));
-    args
+    Ok(args)
 }
 
 fn parse_grouped(tokens: &mut TokenStream) -> PResult<Expr> {
@@ -704,7 +734,7 @@ fn parse_call(tokens: &mut TokenStream) -> PResult<Expr> {
     let mut left = parse_term(tokens)?;
     while let Ok(t) = tokens.expect(|t| matches!(t, TokenValue::LParen)) {
         let span = t.span;
-        let args = parse_args(tokens);
+        let args = parse_args(tokens)?;
         let _ = tokens.expect(|t| matches!(t, TokenValue::RParen))?;
         left = Expr::Call {
             span,
@@ -728,7 +758,7 @@ fn parse_props(tokens: &mut TokenStream) -> Vec<String> {
 
 fn parse_methods(tokens: &mut TokenStream) -> Vec<Expr> {
     let mut methods = Vec::new();
-    while let Ok(method) = parse_func(tokens) {
+    while let Ok(method) = parse_method(tokens) {
         methods.push(method);
     }
     methods
@@ -752,6 +782,35 @@ fn parse_body(tokens: &mut TokenStream) -> Vec<Block> {
         body.push(expr);
     }
     body
+}
+
+fn parse_method(tokens: &mut TokenStream) -> PResult<Expr> {
+    let name_or_kw = tokens
+        .expect(|t| matches!(t, TokenValue::Fn | TokenValue::Identifier(_)))
+        .map_err(|_| ParseError::Continue)?;
+    let span = name_or_kw.span.clone();
+    let name = match name_or_kw.value {
+        TokenValue::Fn => match tokens.expect_identifier()?.value {
+            TokenValue::Identifier(name) => name,
+            _ => return Err(ParseError::Interrupt("Expected identifier or fn token", name_or_kw)),
+        },
+        TokenValue::Identifier(name) => name,
+        _ => unreachable!(),
+    };
+    let _ = tokens.expect(|t| matches!(t, TokenValue::LParen))?;
+    let params = parse_params(tokens);
+    let _ = tokens.expect(|t| matches!(t, TokenValue::RParen))?;
+    let _ = tokens.expect(|t| matches!(t, TokenValue::LBrace))?;
+    let body = parse_body(tokens);
+    let _ = tokens.expect(|t| matches!(t, TokenValue::RBrace))?;
+
+    Ok(Expr::Func {
+        span,
+        name: Some(name),
+        params,
+        body,
+    })
+
 }
 
 fn parse_func(tokens: &mut TokenStream) -> PResult<Expr> {
@@ -819,7 +878,7 @@ fn parse_impl(tokens: &mut TokenStream) -> PResult<Statement> {
             value: TokenValue::For,
             span,
         }) => {
-            let target = tokens.expect_identifier()?;
+            let target = tokens.expect(|t| matches!(t, TokenValue::Identifier(_) | TokenValue::Star))?;
             Ok(Statement::ImplFor { span, name, target })
         }
         Ok(Token {
