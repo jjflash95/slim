@@ -116,7 +116,7 @@ fn get_scope() -> Scope {
 
 pub fn get_file_contents(span: &Span, program: Option<&str>) -> String {
     let mut c = String::new();
-    let _ = match span.filename.as_str() {
+    match span.filename.as_str() {
         "<stdin>" => {
             c = program.unwrap().to_string();
         }
@@ -153,7 +153,7 @@ pub fn get_runtime_err_msg(spans: &[Span], e: String, program: Option<&str>) -> 
         })
         .collect::<Vec<(String, String, Span)>>();
 
-    eprint!("Traceback (most recent call last):\n");
+    eprintln!("Traceback (most recent call last):");
     for (n, (header, line, span)) in fail_lines.iter().enumerate() {
         let _line = if n == 0 && span.filename == "<stdin>" {
             let ls: Vec<&str> = program.unwrap().trim_end().lines().collect();
@@ -168,7 +168,7 @@ pub fn get_runtime_err_msg(spans: &[Span], e: String, program: Option<&str>) -> 
             + "^";
         eprint!("{}\n{}\n{}\n\n", header, _line, indicator);
     }
-    format!("{}", e)
+    e.to_string()
 }
 
 pub fn get_parse_err_msg(token: Token, e: &str, program: Option<&str>) -> String {

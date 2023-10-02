@@ -560,7 +560,7 @@ fn parse_args(tokens: &mut TokenStream) -> PResult<Vec<Expr>> {
         match parse_expression(tokens) {
             Ok(expr) => {
                 args.push(expr);
-                if let Err(_) = tokens.expect(|t| matches!(t, TokenValue::Comma)) {
+                if tokens.expect(|t| matches!(t, TokenValue::Comma)).is_err() {
                     break;
                 }
             }

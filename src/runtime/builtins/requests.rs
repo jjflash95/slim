@@ -34,10 +34,10 @@ fn json_to_obj(json_value: Value) -> ObjectRef {
     }
 }
 
-impl Into<Object> for HeaderMap {
-    fn into(self) -> Object {
+impl From<HeaderMap> for Object {
+    fn from(val: HeaderMap) -> Self {
         let mut map = HashMap::new();
-        for (k, v) in self {
+        for (k, v) in val {
             let key = if k.is_some() {
                 k.unwrap().as_str().to_string()
             } else {
@@ -52,10 +52,10 @@ impl Into<Object> for HeaderMap {
     }
 }
 
-impl Into<Object> for HashMap<String, Value> {
-    fn into(self) -> Object {
+impl From<HashMap<String, Value>> for Object {
+    fn from(val: HashMap<String, Value>) -> Self {
         let mut map = HashMap::new();
-        for (k, v) in self {
+        for (k, v) in val {
             map.insert(k, json_to_obj(v));
         }
         Object::Collection(map)
