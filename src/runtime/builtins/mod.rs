@@ -1,5 +1,5 @@
-mod net;
 mod filesystem;
+mod net;
 mod requests;
 
 use std::cell::RefCell;
@@ -40,11 +40,7 @@ pub fn split(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
             )
             .into(),
         },
-        _ => Err(rt_err!(
-            span,
-            "Expected string but got <{:?}> instead",
-            arg,
-        ))?,
+        _ => Err(rt_err!(span, "Expected string but got <{:?}> instead", arg,))?,
     })
 }
 
@@ -54,10 +50,9 @@ fn pop(_: &mut Scope, span: &Span, args: Vec<ObjectRef>) -> EResult<ObjectRef> {
     }
     let mut arg = args[0].borrow_mut();
     if let Object::Sequence(s) = &mut *arg {
-        return s.pop().ok_or(rt_err!(
-            span,
-            "Cannot pop from empty sequence",
-        ));
+        return s
+            .pop()
+            .ok_or(rt_err!(span, "Cannot pop from empty sequence",));
     }
     Err(rt_err!(span, "pop takes a sequence"))
 }
@@ -118,7 +113,10 @@ pub fn slice(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
             Ok(Object::Sequence(seq[start as usize..end as usize].into()).into())
         }
         Object::Str(s) => Ok(Object::Str(s[start as usize..end as usize].to_string()).into()),
-        _ => Err(rt_err!(span, "Slice needs a sequence or string as first argument")),
+        _ => Err(rt_err!(
+            span,
+            "Slice needs a sequence or string as first argument"
+        )),
     }
 }
 
@@ -168,11 +166,7 @@ fn uppercase(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
     let arg = next_arg(&mut args, "string").map_err(|s| rt_err!(span, "{}", s))?;
     Ok(match arg.object() {
         Object::Str(s) => Object::Str(s.to_uppercase()).into(),
-        _ => Err(rt_err!(
-            span,
-            "Expected string but got `{:?}` instead",
-            arg,
-        ))?,
+        _ => Err(rt_err!(span, "Expected string but got `{:?}` instead", arg,))?,
     })
 }
 
@@ -180,11 +174,7 @@ fn lowercase(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Ob
     let arg = next_arg(&mut args, "string").map_err(|s| rt_err!(span, "{}", s))?;
     Ok(match arg.object() {
         Object::Str(s) => Object::Str(s.to_lowercase()).into(),
-        _ => Err(rt_err!(
-            span,
-            "Expected string but got `{:?}` instead",
-            arg,
-        ))?,
+        _ => Err(rt_err!(span, "Expected string but got `{:?}` instead", arg,))?,
     })
 }
 

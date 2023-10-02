@@ -51,12 +51,7 @@ pub fn listen(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<O
                 match res {
                     Ok(0) => break,
                     Ok(n) => buf = &buf[n..],
-                    Err(_) => {
-                        return Err(rt_err!(
-                            span,
-                            "Failed socket.write",
-                        ))
-                    }
+                    Err(_) => return Err(rt_err!(span, "Failed socket.write",)),
                 };
             }
             nil!()

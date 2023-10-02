@@ -11,14 +11,15 @@ pub fn parse_ast(program: &str, file: Option<String>) -> Result<Vec<Block>, Pars
     while !stream.is_empty() {
         match parser::parse(&mut stream) {
             Ok(a) => ast.push(a),
-            Err(e) => {
-                match e {
-                    ParseError::Interrupt(e, t) => {
-                        return Err(ParseError::Interrupt(e, t));
-                    }
-                    ParseError::Continue => {
-                        return Err(ParseError::Interrupt("Unexpected token", stream.next().unwrap_or_default()))
-                    }
+            Err(e) => match e {
+                ParseError::Interrupt(e, t) => {
+                    return Err(ParseError::Interrupt(e, t));
+                }
+                ParseError::Continue => {
+                    return Err(ParseError::Interrupt(
+                        "Unexpected token",
+                        stream.next().unwrap_or_default(),
+                    ))
                 }
             },
         };

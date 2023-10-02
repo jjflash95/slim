@@ -196,12 +196,8 @@ impl Object {
 
     pub fn get_trait(&mut self, scope: &mut Scope, field: ObjectRef) -> Result<ObjectRef, String> {
         if let Object::Str(name) = field.borrow().clone() {
-            let common = scope
-                .get_trait_impl(Type::Any)
-                .unwrap_or_default();
-            let mut traits = scope
-                .get_trait_impl(self._type())
-                .unwrap_or_default();
+            let common = scope.get_trait_impl(Type::Any).unwrap_or_default();
+            let mut traits = scope.get_trait_impl(self._type()).unwrap_or_default();
             let _ = traits.extend(common.into_iter());
             traits
                 .get(&name)

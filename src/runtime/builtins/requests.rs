@@ -1,16 +1,15 @@
 extern crate reqwest;
-use std::cell::RefCell;
-use reqwest::header::HeaderMap;
-use serde_json::Value;
-use std::collections::HashMap;
-use std::rc::Rc;
-use crate::runtime::object::{Object, ObjectRef, ToObject};
 use crate::parser::Span;
+use crate::rt_err;
+use crate::runtime::object::{Object, ObjectRef, ToObject};
 use crate::runtime::scope::Scope;
 use crate::runtime::{EResult, RuntimeError};
-use crate::rt_err;
+use reqwest::header::HeaderMap;
+use serde_json::Value;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io::Read;
-
+use std::rc::Rc;
 
 fn json_to_obj(json_value: Value) -> ObjectRef {
     match json_value {
@@ -46,7 +45,7 @@ impl Into<Object> for HeaderMap {
             };
             map.insert(
                 key,
-                Object::Str(v.to_str().unwrap_or_default().to_string()).into()
+                Object::Str(v.to_str().unwrap_or_default().to_string()).into(),
             );
         }
         Object::Collection(map)
@@ -64,7 +63,11 @@ impl Into<Object> for HashMap<String, Value> {
 }
 
 pub fn get(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<ObjectRef> {
-    let url: String = args.remove(0).object().try_into().map_err(|s| rt_err!(span, "{}", s))?;
+    let url: String = args
+        .remove(0)
+        .object()
+        .try_into()
+        .map_err(|s| rt_err!(span, "{}", s))?;
     let mut res = reqwest::blocking::get(url).map_err(|_| rt_err!(span, "Failed to get"))?;
     let status = res.status().as_u16() as i128;
     let headers = res.headers().to_owned().into();
@@ -73,7 +76,10 @@ pub fn get(_: &mut Scope, span: &Span, mut args: Vec<ObjectRef>) -> EResult<Obje
     let json = res.json::<HashMap<String, Value>>().unwrap_or_default();
     let json: Object = json.into();
     let map = HashMap::from([
-        ("status".to_string(), Rc::new(RefCell::new(Object::Int(status)))),
+        (
+            "status".to_string(),
+            Rc::new(RefCell::new(Object::Int(status))),
+        ),
         ("json".to_string(), Rc::new(RefCell::new(json))),
         ("body".to_string(), Rc::new(RefCell::new(Object::Str(body)))),
         ("headers".to_string(), Rc::new(RefCell::new(headers))),

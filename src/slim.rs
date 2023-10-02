@@ -1,9 +1,9 @@
-use crate::parser::ParseError;
 use crate::parser::lexer::Span;
 use crate::parser::lexer::Token;
 use crate::parser::lexer::TokenValue;
 use crate::parser::parse_ast;
 use crate::parser::Block;
+use crate::parser::ParseError;
 use crate::runtime;
 use crate::runtime::builtins;
 use crate::runtime::scope::Scope;
@@ -41,13 +41,15 @@ pub fn interactive() -> Result<(), i32> {
                                 }
                             }
                             Block::Expression(e) => {
-                                if let Err(RuntimeError(span, e)) = runtime::evaluate(&mut scope, &e) {
+                                if let Err(RuntimeError(span, e)) =
+                                    runtime::evaluate(&mut scope, &e)
+                                {
                                     eprintln!("{}", get_runtime_err_msg(&span, e, Some(&program)));
                                 }
                             }
                         };
                     }
-                },
+                }
                 Err(ParseError::Interrupt(e, t)) => {
                     eprintln!("{}", get_parse_err_msg(t, e, Some(&program)));
                 }
@@ -103,7 +105,11 @@ fn get_scope() -> Scope {
         scope.add_builtin(name, f)
     }
     let prelude = include_bytes!("./prelude");
-    let ast = parse_ast(String::from_utf8_lossy(prelude).as_ref(), Some("./prelude".to_string())).expect("Failed to parse prelude");
+    let ast = parse_ast(
+        String::from_utf8_lossy(prelude).as_ref(),
+        Some("./prelude".to_string()),
+    )
+    .expect("Failed to parse prelude");
     execute_tree(&mut scope, &ast).expect("Failed to execute prelude");
     scope
 }
@@ -113,24 +119,39 @@ pub fn get_file_contents(span: &Span, program: Option<&str>) -> String {
     let _ = match span.filename.as_str() {
         "<stdin>" => {
             c = program.unwrap().to_string();
-        },
+        }
         "./prelude" => {
             c = String::from_utf8_lossy(include_bytes!("./prelude")).to_string();
-        },
+        }
         path => {
-            fs::File::open(path).unwrap().read_to_string(&mut c).unwrap();
+            fs::File::open(path)
+                .unwrap()
+                .read_to_string(&mut c)
+                .unwrap();
         }
     };
     c
 }
 
 pub fn get_runtime_err_msg(spans: &[Span], e: String, program: Option<&str>) -> String {
-    let fail_lines = spans.iter().rev().map(|s| {
+    let fail_lines = spans
+        .iter()
+        .rev()
+        .map(|s| {
             let contents = get_file_contents(s, program);
-            contents.lines().map(|l| {
-                (format!("File: \"{}\", line {}", s.filename, s.row + 1), l.trim_end().to_owned(), s.to_owned())
-            }).collect::<Vec<(String, String, Span)>>()[s.row].clone()
-        }).collect::<Vec<(String, String, Span)>>();
+            contents
+                .lines()
+                .map(|l| {
+                    (
+                        format!("File: \"{}\", line {}", s.filename, s.row + 1),
+                        l.trim_end().to_owned(),
+                        s.to_owned(),
+                    )
+                })
+                .collect::<Vec<(String, String, Span)>>()[s.row]
+                .clone()
+        })
+        .collect::<Vec<(String, String, Span)>>();
 
     eprint!("Traceback (most recent call last):\n");
     for (n, (header, line, span)) in fail_lines.iter().enumerate() {
@@ -155,15 +176,24 @@ pub fn get_parse_err_msg(token: Token, e: &str, program: Option<&str>) -> String
     let row = token.span.row;
     let mut p = String::new();
     let fail_line = if program.is_none() {
-        let _ = fs::File::open(span.filename).unwrap().read_to_string(&mut p).unwrap();
+        let _ = fs::File::open(span.filename)
+            .unwrap()
+            .read_to_string(&mut p)
+            .unwrap();
         p.lines().collect::<Vec<&str>>()[row].trim_end()
     } else {
-        program.unwrap().lines().collect::<Vec<&str>>().last().unwrap().trim_end()
+        program
+            .unwrap()
+            .lines()
+            .collect::<Vec<&str>>()
+            .last()
+            .unwrap()
+            .trim_end()
     };
 
     let col = match &token.value {
         TokenValue::EOF => fail_line.len() - 1,
-        _ => token.span.col
+        _ => token.span.col,
     };
     let indicator = fail_line[..col]
         .chars()

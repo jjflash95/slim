@@ -268,17 +268,16 @@ fn parse_from_import(tokens: &mut TokenStream) -> PResult<Statement> {
 
     let _ = tokens.expect(|t| matches!(t, TokenValue::Import))?;
     let _ = tokens.expect(|t| matches!(t, TokenValue::LBrace))?;
-    let names = comma_separated(parse_identifier)(
-        tokens,
-    ).into_iter().map(
-        |e| {
+    let names = comma_separated(parse_identifier)(tokens)
+        .into_iter()
+        .map(|e| {
             if let Expr::Term(_, TokenValue::Identifier(name)) = e {
                 name
             } else {
                 panic!("Expected identifier")
             }
-        }
-    ).collect();
+        })
+        .collect();
     let _ = tokens.expect(|t| matches!(t, TokenValue::RBrace))?;
 
     Ok(Statement::ImportNames { span, path, names })
@@ -301,7 +300,10 @@ fn parse_import(tokens: &mut TokenStream) -> PResult<Statement> {
 fn parse_optional(tokens: &mut TokenStream) -> PResult<Expr> {
     let inner = parse_expression(tokens)?;
     if let Ok(o) = tokens.expect(|t| matches!(t, TokenValue::QuestionMark)) {
-        Ok(Expr::Optional { span: o.span, inner: Box::new(inner) })
+        Ok(Expr::Optional {
+            span: o.span,
+            inner: Box::new(inner),
+        })
     } else {
         Ok(inner)
     }
@@ -559,13 +561,13 @@ fn parse_args(tokens: &mut TokenStream) -> PResult<Vec<Expr>> {
             Ok(expr) => {
                 args.push(expr);
                 if let Err(_) = tokens.expect(|t| matches!(t, TokenValue::Comma)) {
-                    break
+                    break;
                 }
-            },
+            }
             Err(ParseError::Continue) => break,
             Err(e) => return Err(e),
         }
-    };
+    }
 
     tokens.next_if(|t| matches!(t, TokenValue::Comma));
     Ok(args)
@@ -792,7 +794,12 @@ fn parse_method(tokens: &mut TokenStream) -> PResult<Expr> {
     let name = match name_or_kw.value {
         TokenValue::Fn => match tokens.expect_identifier()?.value {
             TokenValue::Identifier(name) => name,
-            _ => return Err(ParseError::Interrupt("Expected identifier or fn token", name_or_kw)),
+            _ => {
+                return Err(ParseError::Interrupt(
+                    "Expected identifier or fn token",
+                    name_or_kw,
+                ))
+            }
         },
         TokenValue::Identifier(name) => name,
         _ => unreachable!(),
@@ -810,7 +817,6 @@ fn parse_method(tokens: &mut TokenStream) -> PResult<Expr> {
         params,
         body,
     })
-
 }
 
 fn parse_func(tokens: &mut TokenStream) -> PResult<Expr> {
@@ -878,7 +884,8 @@ fn parse_impl(tokens: &mut TokenStream) -> PResult<Statement> {
             value: TokenValue::For,
             span,
         }) => {
-            let target = tokens.expect(|t| matches!(t, TokenValue::Identifier(_) | TokenValue::Star))?;
+            let target =
+                tokens.expect(|t| matches!(t, TokenValue::Identifier(_) | TokenValue::Star))?;
             Ok(Statement::ImplFor { span, name, target })
         }
         Ok(Token {
