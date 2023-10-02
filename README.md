@@ -31,7 +31,7 @@ struct Cons { head }
 struct Node { value, next }
 
 impl Cons {
-    fn add(value) {
+    add(value) {
         curr = self.head
         return loop {
             if curr.next == nil {
